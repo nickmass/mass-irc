@@ -3,25 +3,20 @@ extern crate nom;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate tokio;
+extern crate termion;
 
-mod command_type;
-mod parse;
-use parse::*;
+use std::io::{stdout, stdin};
 
-mod client;
-use client::Client;
+mod irc;
+use irc::client::Client;
+
+mod term;
+use term::Terminal;
 
 fn main() {
     env_logger::LogBuilder::new().parse("debug").init().unwrap();
-    Client::start();
-
-    return;
-
-    let i = b"@asdad=asdad;123123=qqqq :nick!user@example.com PRIVMSG #channel :https://example.com/a-news-story\r\n".to_vec();
-    println!("Input:  {:?}", String::from_utf8(i.clone()).unwrap());
-    let parser = CommandParser::new(i);
-    let r = parser.parse();
-
-    println!("Output: {:?}", r.to_cmd());
-    println!("Output: {:?}", r);
+    let term = Terminal::new(stdin(), stdout());
+    let client = Client::new(term, "127.0.0.1:6667".parse().unwrap());
+    client.connect();
 }

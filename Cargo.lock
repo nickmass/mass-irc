@@ -6,6 +6,7 @@ dependencies = [
  "futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "termion 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.0 (git+https://github.com/tokio-rs/tokio)",
 ]
 
@@ -186,6 +187,14 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "termion"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "thread-id"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +278,7 @@ dependencies = [
 "checksum slab 0.2.0 (git+https://github.com/carllerche/slab)" = "<none>"
 "checksum slab 0.2.0 (git+https://github.com/carllerche/slab?rev=5476efcafb)" = "<none>"
 "checksum take 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b157868d8ac1f56b64604539990685fa7611d8fa9e5476cf0c02cf34d32917c5"
+"checksum termion 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "88dc2050416bbfaa5f42a939c4e1748f12b58546377eff8d1499a533cbcf4f80"
 "checksum thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a9539db560102d1cef46b8b78ce737ff0bb64e7e18d35b2a5688f7d097d0ff03"
 "checksum thread_local 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "55dd963dbaeadc08aa7266bf7f91c3154a7805e32bb94b820b769d2ef3b4744d"
 "checksum tokio 0.1.0 (git+https://github.com/tokio-rs/tokio)" = "<none>"
