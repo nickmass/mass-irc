@@ -6,7 +6,7 @@ use self::tokio::reactor::*;
 use self::tokio::io::{TryWrite, TryRead, Readiness, Transport};
 use self::tokio::proto::pipeline;
 use self::tokio::proto::pipeline::{Server, Frame};
-use self::futures::{done, Future};
+use self::futures::{Future};
 use std::io;
 
 use super::parse::{Command, CommandParser};
@@ -18,7 +18,7 @@ impl Client {
 
         let stream = TcpStream::connect(&"127.0.0.1:6667".parse().unwrap()).unwrap();
         let server = Server::new(tokio::simple_service(|r| {
-            futures::done(Ok(CommandParser::new(b"NICK nickmass".to_vec()).parse()))
+            Ok(CommandParser::new(b"NICK nickmass".to_vec()).parse())
         })
         , IrcTransport::new(stream)).unwrap();
         let handle = &reactor.handle();
