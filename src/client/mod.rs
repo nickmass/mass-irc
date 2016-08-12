@@ -17,10 +17,14 @@ impl Client {
         let reactor = Reactor::default().unwrap();
 
         let stream = TcpStream::connect(&"127.0.0.1:6667".parse().unwrap()).unwrap();
-        let server = Server::new(tokio::simple_service(|r| {
-            Ok(CommandParser::new(b"NICK nickmass".to_vec()).parse())
-        })
-        , IrcTransport::new(stream)).unwrap();
+        let server = Server::new(
+            /*
+            tokio::simple_service(|r| {
+                Ok(CommandParser::new(b"NICK nickmass".to_vec()).parse())
+            })
+            */
+            IrcService::new()
+            , IrcTransport::new(stream)).unwrap();
         let handle = &reactor.handle();
 
         handle.schedule(server);
@@ -58,13 +62,14 @@ impl IrcService {
 }
 
 impl Service for IrcService {
-    type Req = String;
+    type Req = Command;
     type Resp = Command;
     type Error = ServiceError;
     type Fut = Box<Future<Item = Self::Resp, Error = Self::Error>>;
 
-    fn call(&self, req: String) -> Self::Fut {
-        println!("Req: {:?}", req);
+    fn call(&self, req: Command) -> Self::Fut {
+        println!("Req: {:?}", req.to_cmd());
+        futures::finished(CommandParser::new(b"NICK nickmass".to_vec()).parse()).boxed()
     }
 }
 
@@ -95,7 +100,7 @@ impl<T> Readiness for IrcTransport<T> {
 
 impl<T: TryRead + TryWrite + Readiness> Transport for IrcTransport<T> {
     type In = Command;
-    type Out = String;
+    type Out = Command;
 
     fn read(&mut self) -> io::Result<Option<Self::Out>> {
         let mut buf = Vec::new();
@@ -116,7 +121,7 @@ impl<T: TryRead + TryWrite + Readiness> Transport for IrcTransport<T> {
                 self.read_buf.append(&mut buf);
                 if self.read_buf.len() > 0 {
                     println!("{}", ::std::str::from_utf8(&*self.read_buf).unwrap());
-                    return Ok(Some(String::from_utf8(self.read_buf.clone()).unwrap()));
+                    return Ok(Some(CommandParser::new(self.read_buf.clone()).parse()));
                 }
                 self.read_buf = remainder;
             }
