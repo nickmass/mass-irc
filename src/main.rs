@@ -1,3 +1,4 @@
+extern crate mio;
 #[macro_use]
 extern crate nom;
 #[macro_use]

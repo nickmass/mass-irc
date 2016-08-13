@@ -5,6 +5,7 @@ dependencies = [
  "env_logger 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio 0.6.0-dev (git+https://github.com/carllerche/mio?branch=dev)",
  "nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.0 (git+https://github.com/tokio-rs/tokio)",

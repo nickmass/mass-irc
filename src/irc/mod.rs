@@ -86,8 +86,8 @@ impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
 
     fn flush(&mut self) -> io::Result<Option<()>>{
         if self.write_buf.len() > 0 {
-            self.stream.write_all(&*self.write_buf);
-            self.stream.flush();
+            try!(self.stream.write_all(&*self.write_buf));
+            try!(self.stream.flush());
             self.write_buf = Vec::new();
         }
         Ok(Some(()))

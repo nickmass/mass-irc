@@ -1,6 +1,7 @@
-use super::termion::input::{TermRead};
-use super::termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Read, Write};
+pub mod stream;
+pub use self::stream::TermStream;
+
+use std::io::{Write};
 use std::io;
 
 
@@ -9,39 +10,37 @@ use super::tokio::proto::pipeline;
 
 use super::irc::{Command, UserCommand};
 
-pub struct Terminal<I: Read + TermRead, O: Write + IntoRawMode> {
-    in_stream: I,
-    out_stream: RawTerminal<O>,
+pub struct Terminal {
+    stream: TermStream,
     read_buf: Vec<u8>,
 }
 
 
 
-impl<I: Read + TermRead, O: Write + IntoRawMode> Terminal<I, O> {
-    pub fn new(in_stream: I, out_stream: O) -> Terminal<I, O> {
+impl Terminal {
+    pub fn new(stream: TermStream) -> Terminal {
         Terminal {
-            in_stream: in_stream,
-            out_stream: out_stream.into_raw_mode().unwrap(),
+            stream: stream,
             read_buf: Vec::new(),
         }
     }
 }
 
 
-impl<I: Read, O: Write> Readiness for Terminal<I, O> {
+impl Readiness for Terminal {
     fn is_readable(&self) -> bool {
-        true
+        self.stream.is_readable()
     }
 
     fn is_writable(&self) -> bool {
-        true
+        self.stream.is_writable()
     }
 }
 
 pub type InFrame = pipeline::Frame<Command, io::Error>;
 pub type OutFrame = pipeline::Frame<UserCommand, io::Error>;
 
-impl<I: Read + TermRead, O: Write> Transport for Terminal<I, O> {
+impl Transport for Terminal {
     type In = InFrame;
     type Out = OutFrame;
 
@@ -57,8 +56,8 @@ impl<I: Read + TermRead, O: Write> Transport for Terminal<I, O> {
         }
 
         let mut buf = [0;512];
-        if let Ok(bytes) = self.in_stream.read(&mut buf) {
-            write!(self.out_stream, "{}", ::std::str::from_utf8(&buf).unwrap());
+        if let Ok(bytes) = self.stream.read(&mut buf) {
+            try!(self.stream.write_all(&buf));
             self.read_buf.extend_from_slice(&mut buf[0..bytes]);
         }
         Ok(None)
@@ -67,7 +66,7 @@ impl<I: Read + TermRead, O: Write> Transport for Terminal<I, O> {
     fn write(&mut self, req: Self::In) -> io::Result<Option<()>>{
         match req {
             pipeline::Frame::Message(cmd) => {
-                let _ = write!(self.out_stream, "{}", cmd.to_cmd());
+                try!(self.stream.write_all(cmd.to_cmd().as_bytes()));
             },
             _ => {}
         }
