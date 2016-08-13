@@ -93,7 +93,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn to_cmd(&self) -> String {
+    pub fn to_string(&self) -> String {
         let cmd: &str = self.command.into();
         format!("{}{}{}{}\r\n", self.tags.as_ref().map(|x|x.to_cmd()).unwrap_or("".to_string()),
                             self.prefix.as_ref().map(|x|x.to_cmd()).unwrap_or("".to_string()),

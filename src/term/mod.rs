@@ -68,7 +68,7 @@ impl Transport for Terminal {
     fn write(&mut self, req: Self::In) -> io::Result<Option<()>>{
         match req {
             pipeline::Frame::Message(cmd) => {
-                try!(self.stream.write_all(cmd.to_cmd().as_bytes()));
+                try!(self.stream.write_all(cmd.to_string().as_bytes()));
             },
             _ => {}
         }

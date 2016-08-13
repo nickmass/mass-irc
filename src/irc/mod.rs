@@ -71,7 +71,7 @@ impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
     fn write(&mut self, req: Self::In) -> io::Result<Option<()>>{
         match req {
             pipeline::Frame::Message(cmd) => {
-                self.write_buf.append(&mut cmd.to_cmd().into_bytes());
+                self.write_buf.append(&mut cmd.to_string().into_bytes());
                 if self.write_buf.len() > 0 {
                     if let Some(bytes) = try!(self.stream.try_write(&*self.write_buf)) {
                         self.write_buf = self.write_buf.split_off(bytes);
