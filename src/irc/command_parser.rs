@@ -8,6 +8,7 @@ pub struct CommandParser {
 
 impl CommandParser {
     pub fn new(message: Vec<u8>) -> CommandParser {
+        println!("Parsing `{:?}`", String::from_utf8(message.clone()));
         CommandParser { raw: message }
     }
 
