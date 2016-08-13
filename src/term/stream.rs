@@ -57,6 +57,6 @@ impl Write for TermStream {
     }
 
     fn flush(&mut self) -> Result<()> {
-        Ok(())
+        self.out_stream.flush()
     }
 }
