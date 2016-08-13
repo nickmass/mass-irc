@@ -7,7 +7,7 @@ extern crate env_logger;
 extern crate tokio;
 extern crate termion;
 
-use termion::{cursor, terminal_size, clear};
+use termion::{color, cursor, terminal_size, clear};
 
 mod irc;
 use irc::client::Client;
@@ -104,10 +104,12 @@ fn main() {
                 vis_line.push(b' ');
             }
 
-            term.write_all(&*format!("{}{}{}{}{}",
+            term.write_all(&*format!("{}{}{}{}{}{}{}",
                                      cursor::Goto(1,1),
+                                     color::Fg(color::White),
                                      String::from_utf8(messages_out).unwrap(),
                                      cursor::Goto(1,size.1),
+                                     color::Fg(color::LightWhite),
                                      String::from_utf8(vis_line).unwrap(),
                                      cursor::Goto(vis_end ,size.1)
                                     ).into_bytes());
