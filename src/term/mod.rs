@@ -45,7 +45,7 @@ impl Transport for Terminal {
     type Out = OutFrame;
 
     fn read(&mut self) -> io::Result<Option<Self::Out>> {
-        if let Some(index) = self.read_buf.iter().position(|x| *x == b'\n') {
+        if let Some(index) = self.read_buf.iter().position(|x| *x == 13) {
             let mut remainder = self.read_buf.split_off(index + 1);
             let mut out_buf = Vec::new();
             out_buf.append(&mut self.read_buf);
@@ -55,10 +55,12 @@ impl Transport for Terminal {
                         )));
         }
 
-        let mut buf = [0;512];
+        let mut buf = [0;128];
         if let Ok(bytes) = self.stream.read(&mut buf) {
             try!(self.stream.write_all(&buf));
-            self.read_buf.extend_from_slice(&mut buf[0..bytes]);
+            if bytes > 0 {
+                self.read_buf.extend_from_slice(&mut buf[0..bytes]);
+            }
         }
         Ok(None)
     }

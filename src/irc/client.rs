@@ -38,7 +38,6 @@ impl Client {
             }
         };
 
-
         connect(&reactor, addr,|stream, term, timer| {
             Ok(ClientTask::new(stream, term, timer))
         });
@@ -93,11 +92,12 @@ impl Task for ClientTask {
                                         .command(CommandType::Pong)
                                         .add_param(msg.params.data[0].clone())
                                         .build().unwrap());
+                                try!(self.term.write(Frame::Message(msg)));
                                 try!(self.term.write(pong));
                             },
-                            _ => {}
+                            _ => { try!(self.term.write(Frame::Message(msg))); }
+
                         }
-                        try!(self.term.write(Frame::Message(msg)));
                     }
                 },
                 _ => {}
@@ -110,7 +110,7 @@ impl Task for ClientTask {
 
         match self.timer.poll() {
             Some(_) => {
-                let _ = self.timer.set_timeout(::std::time::Duration::from_millis(50), ());
+                let _ = self.timer.set_timeout(::std::time::Duration::from_millis(16), ());
             },
             None => ()
         }
