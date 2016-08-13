@@ -8,7 +8,7 @@ pub struct CommandParser {
 
 impl CommandParser {
     pub fn new(message: Vec<u8>) -> CommandParser {
-        println!("Parsing `{:?}`", String::from_utf8(message.clone()));
+        //println!("Parsing `{:?}`", String::from_utf8(message.clone()));
         CommandParser { raw: message }
     }
 
@@ -118,25 +118,31 @@ impl CommandParser {
                                     || tri ));
 
         named!(command<&str, CommandType >, chain! (
-                                r: alt!(digits | alpha) ~
-                                tag_s!(" "),
+                                r: alt!(digits | alpha),
                                 || r.into()));
 
         named!(param<&str, String >,
                chain!(
+                   tag_s!(" ") ~
                    not!(tag_s!(":")) ~
-                   param: is_not_s!(" \r\n\0") ~
-                   tag_s!(" "),
+                   param: is_not_s!(" \r\n\0") , 
                    || param.to_string()));
+
+        named!(trailing<&str, String >, chain! (
+                    tag_s!(" ") ~
+                    tag_s!(":") ~
+                    trailing: is_not_s!("\r\n\0"),
+                    || trailing.to_string()));
 
         named!(params<&str, Params >,
                chain!(
                    params: many0!(param) ~
-                   trailing: preceded!(tag_s!(":"), is_not_s!("\r\n\0"))?,
+                   trailing: trailing? ~
+                   tag_s!("\r\n"),
                     || {
                             let mut params = params;
                             if trailing.is_some() {
-                                params.push(trailing.unwrap().to_string())
+                                params.push(trailing.unwrap())
                             }
                             Params { data: params }
                     }));
@@ -145,13 +151,15 @@ impl CommandParser {
                                         tags: tag_prefix_parser? ~
                                         prefix: prefix? ~
                                         command: command ~
-                                        params: params ~
-                                        tag_s!("\r\n"),
+                                        params: params,
                                         || {
                                             Command { tags: tags, prefix: prefix, command: command, params: params }
                                         }));
 
         let r = command_parser(str::from_utf8(&*self.raw).unwrap());
+        if r.is_err() {
+            println!("{:?}", r);
+        }
         r.unwrap().1
     }
 }

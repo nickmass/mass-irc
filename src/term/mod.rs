@@ -9,19 +9,19 @@ use super::tokio::proto::pipeline;
 
 use super::irc::{Command, UserCommand};
 
-pub struct Terminal<I: Read + TermRead, O: Write> {
+pub struct Terminal<I: Read + TermRead, O: Write + IntoRawMode> {
     in_stream: I,
-    out_stream: O,
+    out_stream: RawTerminal<O>,
     read_buf: Vec<u8>,
 }
 
 
 
-impl<I: Read + TermRead, O: Write> Terminal<I, O> {
+impl<I: Read + TermRead, O: Write + IntoRawMode> Terminal<I, O> {
     pub fn new(in_stream: I, out_stream: O) -> Terminal<I, O> {
         Terminal {
             in_stream: in_stream,
-            out_stream: out_stream,
+            out_stream: out_stream.into_raw_mode().unwrap(),
             read_buf: Vec::new(),
         }
     }
@@ -46,30 +46,20 @@ impl<I: Read + TermRead, O: Write> Transport for Terminal<I, O> {
     type Out = OutFrame;
 
     fn read(&mut self) -> io::Result<Option<Self::Out>> {
-
-                return Ok(Some(pipeline::Frame::Message(
-                            UserCommand::Nick("MALIGO".to_string())
-                            )));
         if let Some(index) = self.read_buf.iter().position(|x| *x == b'\n') {
-            let remainder = self.read_buf.split_off(index);
-            debug!("Got Term");
-            if self.read_buf.len() > 0 {
-                let out_buf = String::from_utf8(self.read_buf.clone()).unwrap();
-
-                return Ok(Some(pipeline::Frame::Message(
-                            UserCommand::Nick("MALIGO".to_string())
-                            )));
-            }
-            self.read_buf = remainder;
+            let mut remainder = self.read_buf.split_off(index + 1);
+            let mut out_buf = Vec::new();
+            out_buf.append(&mut self.read_buf);
+            self.read_buf.append(&mut remainder);
+            return Ok(Some(pipeline::Frame::Message(
+                        UserCommand::Nick(String::from_utf8(out_buf).unwrap())
+                        )));
         }
 
-        let mut buf = Vec::new();
-        if let Ok(bytes) = self.in_stream.read_to_end(&mut buf) {
-            if bytes > 0 {
-                debug!("Got Term BYtes");
-                buf.truncate(bytes);
-                self.read_buf.append(&mut buf);
-            }
+        let mut buf = [0;512];
+        if let Ok(bytes) = self.in_stream.read(&mut buf) {
+            write!(self.out_stream, "{}", ::std::str::from_utf8(&buf).unwrap());
+            self.read_buf.extend_from_slice(&mut buf[0..bytes]);
         }
         Ok(None)
     }

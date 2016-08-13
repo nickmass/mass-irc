@@ -24,16 +24,13 @@ struct Irc<T> {
 
 impl<T: TryRead + TryWrite + Readiness> Irc<T> {
     fn new(stream: T) -> Irc<T> {
-        let mut write_buf = Vec::new();
-        write_buf.append(&mut b"USER nickmass 8 * : Nick Massey\r\n".to_vec());
-        write_buf.append(&mut b"NICK nickmass\r\n".to_vec());
-        Irc { stream: stream, read_buf: Vec::new(), write_buf: write_buf}
+        Irc { stream: stream, read_buf: Vec::new(), write_buf: Vec::new()}
     }
 }
 
 impl<T> Readiness for Irc<T> {
     fn is_readable(&self) -> bool {
-        self.read_buf.len() > 0
+        true
     }
 
     fn is_writable(&self) -> bool {
@@ -42,31 +39,31 @@ impl<T> Readiness for Irc<T> {
 }
 
 type Frame = pipeline::Frame<Command, io::Error>;
+type OutFrame = pipeline::Frame<Vec<Command>, io::Error>;
 
 impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
     type In = Frame;
-    type Out = Frame;
+    type Out = OutFrame;
 
     fn read(&mut self) -> io::Result<Option<Self::Out>> {
-        if let Some(index) = self.read_buf.iter().position(|x| *x == b'\n') {
-            let mut remainder = self.read_buf.split_off(index + 1);
-
-            if self.read_buf.len() > 0 {
+        let mut res = Vec::new();
+        loop {
+            if let Some(index) = self.read_buf.iter().position(|x| *x == b'\n') {
+                let mut remainder = self.read_buf.split_off(index + 1);
                 let mut out_buf = Vec::new();
                 out_buf.append(&mut self.read_buf);
                 self.read_buf.append(&mut remainder);
-                return Ok(Some(pipeline::Frame::Message(
-                            CommandParser::new(out_buf).parse()
-                            )));
+                res.push(CommandParser::new(out_buf).parse());
+            } else {
+                if res.len() > 0 {
+                    return Ok(Some(pipeline::Frame::Message(res)));
+                }
+                break;
             }
-            self.read_buf.append(&mut remainder);
         }
-        
-        if self.stream.is_readable() {
-            let mut buf = [0;10];
-            if let Ok(()) = self.stream.read_exact(&mut buf) {
-                self.read_buf.extend_from_slice(&mut buf);
-            }
+        let mut buf = [0;0x4096];
+        if let Some(bytes) = try!(self.stream.try_read(&mut buf)) {
+            self.read_buf.extend_from_slice(&mut buf[0..bytes]);
         }
         Ok(None)
     }
@@ -74,10 +71,9 @@ impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
     fn write(&mut self, req: Self::In) -> io::Result<Option<()>>{
         match req {
             pipeline::Frame::Message(cmd) => {
-                //self.write_buf.append(&mut cmd.to_cmd().into_bytes());
+                self.write_buf.append(&mut cmd.to_cmd().into_bytes());
                 if self.write_buf.len() > 0 {
                     if let Some(bytes) = try!(self.stream.try_write(&*self.write_buf)) {
-                        println!("{} - {}", bytes, ::std::str::from_utf8(&*self.write_buf).unwrap());
                         self.write_buf = self.write_buf.split_off(bytes);
                         return Ok(Some(()));
                     }
@@ -89,6 +85,11 @@ impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
     }
 
     fn flush(&mut self) -> io::Result<Option<()>>{
-        Ok(None)
+        if self.write_buf.len() > 0 {
+            self.stream.write_all(&*self.write_buf);
+            self.stream.flush();
+            self.write_buf = Vec::new();
+        }
+        Ok(Some(()))
     }
 }

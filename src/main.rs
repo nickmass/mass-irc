@@ -26,6 +26,21 @@ mod tests {
 
     use irc::{CommandParser, CommandBuilder, CommandType};
     #[test]
+    fn parserone() {
+        let i = b":irc.example.net NOTICE nickmass :Connection.\r\n";
+        let c1 = CommandParser::new(i.to_vec()).parse();
+        let c2 = CommandBuilder::new()
+            .server_sender("irc.example.net".to_string())
+            .command(CommandType::Notice)
+            .add_param("nickmass".to_string())
+            .add_param("Connection.".to_string())
+            .build().unwrap();
+
+        assert_eq!(String::from_utf8(i.to_vec()).unwrap(), c2.to_cmd());
+
+    }
+
+    #[test]
     fn parser() {
         let i = b":irc.example.net NOTICE nickmass :Connection statistics: client 0.0 kb, server 1.3 kb.\r\n";
         let c1 = CommandParser::new(i.to_vec()).parse();

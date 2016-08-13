@@ -1,6 +1,6 @@
 use super::{CommandType};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Sender {
     User(String, Option<String>, Option<String>),
     Server(String)
@@ -18,7 +18,7 @@ impl Sender {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Tag { 
     pub key: String,
     pub value: String
@@ -36,7 +36,7 @@ impl Tag {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Tags {
     pub data: Vec<Tag>,
 }
@@ -62,7 +62,7 @@ impl Tags {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Params {
     pub data: Vec<String>,
 }
@@ -84,7 +84,7 @@ impl Params {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Command {
     pub tags: Option<Tags>,
     pub prefix: Option<Sender>,

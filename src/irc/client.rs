@@ -1,14 +1,15 @@
-use super::Irc;
+use super::{Irc, UserCommand, CommandType, CommandBuilder};
 
 use super::super::Terminal;
 
+use super::super::termion::{async_stdin, AsyncReader};
 use super::tokio::tcp::TcpStream;
 use super::tokio::{client};
 use super::tokio::reactor::*;
 use super::tokio::io::{Transport};
 use super::tokio::proto::pipeline::Frame;
 use std::io;
-use std::io::{stdin, stdout, Stdin, Stdout};
+use std::io::{stdin, stdout, Stdout};
 use std::net::SocketAddr;
 
 pub struct Client {
@@ -35,39 +36,71 @@ impl Client {
             }
         };
 
-        client::connect(&reactor, addr, |stream| Ok(ClientTask::new(stream, stdin(), stdout())));
-        //self.reactor.run().unwrap();
+        client::connect(&reactor, addr, |stream| Ok(ClientTask::new(stream, async_stdin(), stdout())));
     }
 }
 
 pub struct ClientTask {
-    input: Terminal<Stdin, Stdout>,
+    input: Terminal<AsyncReader, Stdout>,
     server: Irc<TcpStream>,
+    tick: u64,
 }
 
 impl ClientTask  {
-    fn new(stream: TcpStream, stdin: Stdin, stdout: Stdout) -> ClientTask {
+    fn new(stream: TcpStream, stdin: AsyncReader, stdout: Stdout) -> ClientTask {
         ClientTask {
             input: Terminal::new(stdin, stdout),
             server: Irc::new(stream),
+            tick: 0,
         }
     }
 }
 
 impl Task for ClientTask {
     fn tick(&mut self) -> io::Result<Tick> {
-        //debug!("Start Read");
-        if let Ok(Some(frame)) = self.server.read() {
-           // debug!("Read");
-            self.input.write(frame).unwrap();
+        if self.tick == 1 {
+            self.server.write(Frame::Message(UserCommand::User(
+                        "NickMass".into(),
+                        "8".into(),
+                        "*".into(),
+                        "Nick Massey".into()).to_command().unwrap())).unwrap();
+            self.server.write(Frame::Message(UserCommand::Nick(
+                        "NickMass".into()).to_command().unwrap())).unwrap();
+            self.server.flush();
         }
+        if let Ok(Some(frame)) = self.server.read() {
+            match frame {
+                Frame::Message(bundle) => {
+                    for msg in bundle {
+                        match msg.command {
+                            CommandType::Ping => {
+                                let pong =
+                                    Frame::Message(CommandBuilder::new()
+                                        .command(CommandType::Pong)
+                                        .add_param(msg.params.data[0].clone())
+                                        .build().unwrap());
+                                self.server.write(pong);
+                                let pong =
+                                    Frame::Message(CommandBuilder::new()
+                                        .command(CommandType::Pong)
+                                        .add_param(msg.params.data[0].clone())
+                                        .build().unwrap());
+                                self.input.write(pong);
+                            },
+                            _ => {}
+                        }
+                        self.input.write(Frame::Message(msg)).unwrap();
+                    }
+                },
+                _ => {}
+            }
 
-        //debug!("Start Write");
+        }
         if let Ok(Some(Frame::Message(frame))) = self.input.read() {
-            //debug!("Write");
             self.server.write(Frame::Message(frame.to_command().unwrap())).unwrap();
         }
 
+        self.tick += 1;
         Ok(Tick::WouldBlock)
     }
 }
