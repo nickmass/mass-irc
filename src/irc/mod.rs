@@ -20,11 +20,17 @@ struct Irc<T> {
     stream: T,
     read_buf: Vec<u8>,
     write_buf: Vec<u8>,
+    parser: CommandParser,
 }
 
 impl<T: TryRead + TryWrite + Readiness> Irc<T> {
     fn new(stream: T) -> Irc<T> {
-        Irc { stream: stream, read_buf: Vec::new(), write_buf: Vec::new()}
+        Irc { 
+            stream: stream,
+            read_buf: Vec::new(),
+            write_buf: Vec::new(),
+            parser: CommandParser::new(),
+        }
     }
 }
 
@@ -50,10 +56,9 @@ impl<T: TryRead + TryWrite + Readiness> Transport for Irc<T> {
         loop {
             if let Some(index) = self.read_buf.iter().position(|x| *x == b'\n') {
                 let mut remainder = self.read_buf.split_off(index + 1);
-                let mut out_buf = Vec::new();
-                out_buf.append(&mut self.read_buf);
+                res.push(self.parser.parse(&self.read_buf));
+                self.read_buf.clear();
                 self.read_buf.append(&mut remainder);
-                res.push(CommandParser::new(out_buf).parse());
             } else {
                 if res.len() > 0 {
                     return Ok(Some(pipeline::Frame::Message(res)));

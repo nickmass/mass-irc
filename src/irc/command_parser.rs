@@ -3,16 +3,14 @@ use super::{CommandType};
 use super::command::*;
 
 pub struct CommandParser {
-    raw: Vec<u8>,
 }
 
 impl CommandParser {
-    pub fn new(message: Vec<u8>) -> CommandParser {
-        //println!("Parsing `{:?}`", String::from_utf8(message.clone()));
-        CommandParser { raw: message }
+    pub fn new() -> CommandParser {
+        CommandParser {  }
     }
 
-    pub fn parse(self) -> Command {
+    pub fn parse(&self, message: &Vec<u8>) -> Command {
         fn unescape_tag_value(value: &str) -> String {
             let escape_seqs =
                 vec![("\\\\", "\\"), ("\\:", ";"), ("\\s", " "), ("\\r", "\r"), ("\\n", "\n")];
@@ -156,7 +154,7 @@ impl CommandParser {
                                             Command { tags: tags, prefix: prefix, command: command, params: params }
                                         }));
 
-        let r = command_parser(str::from_utf8(&*self.raw).unwrap());
+        let r = command_parser(str::from_utf8(message).unwrap());
         if r.is_err() {
             println!("{:?}", r);
         }
