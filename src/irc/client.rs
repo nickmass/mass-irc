@@ -1,10 +1,12 @@
 use super::super::mio::timer::Builder;
-use super::super::mio::channel;
 
-use super::{Irc, UserCommand, CommandType, CommandBuilder};
+use super::{Irc, Command, UserCommand, CommandType, CommandBuilder, ClientTunnel};
 
+use super::super::mio::channel::{sync_channel as mio_sync_channel, SyncSender as MioSyncSender};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+
+use super::tokio::util::channel::Receiver as TokioReceiver;
 use super::tokio::util::timer::Timer;
-use super::tokio::util::channel::{Receiver as tokReceiver};
 use super::tokio::tcp::TcpStream;
 use super::tokio::reactor;
 use super::tokio::reactor::*;
@@ -13,7 +15,6 @@ use super::tokio::proto::pipeline::Frame;
 
 use std::io;
 use std::net::SocketAddr;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct Client {
     reactor: Option<ReactorHandle>,
@@ -92,10 +93,10 @@ impl Task for ClientTask {
                                     .command(CommandType::Pong)
                                     .add_param(msg.params.data[0].clone())
                                     .build().unwrap();
-                                self.tunnel.0.try_send(msg.to_string().into_bytes());
-                                self.tunnel.0.try_send(pong.to_string().into_bytes());
+                                self.tunnel.try_write(msg);
+                                self.tunnel.try_write(pong);
                             },
-                            _ => { self.tunnel.0.try_send(msg.to_string().into_bytes()); }
+                            _ => { self.tunnel.try_write(msg); }
 
                         }
                     }
@@ -105,10 +106,9 @@ impl Task for ClientTask {
 
         }
 
-        match self.tunnel.1.recv() {
+        match self.tunnel.try_read() {
             Ok(Some(d)) => {
-                let user_command = UserCommand::Nick(String::from_utf8(d).unwrap());
-                let command = user_command.to_command().unwrap();
+                let command = d.to_command().unwrap();
                 try!(self.server.write(Frame::Message(command)));
             },
             _ => (),
@@ -119,18 +119,17 @@ impl Task for ClientTask {
     }
 }
 
-pub type OuterTunnel = (channel::SyncSender<Vec<u8>>, Receiver<Vec<u8>>);
-pub type InnerTunnel = (SyncSender<Vec<u8>>, tokReceiver<Vec<u8>>);
+pub type OuterTunnel = ClientTunnel<MioSyncSender<UserCommand>, Receiver<Command>, UserCommand, Command>;
+pub type InnerTunnel = ClientTunnel<SyncSender<Command>, TokioReceiver<UserCommand>, Command, UserCommand>;
 
 pub fn connect<T>(reactor: &ReactorHandle, addr: SocketAddr, new_task: T)
     -> OuterTunnel where T: NewTermTask
 {
     let (inner_tx, outer_rx) = sync_channel(256);
-    let (outer_tx, inner_rx) = channel::sync_channel(256);
-    let outer_tunnel = (outer_tx, outer_rx);
+    let (outer_tx, inner_rx) = mio_sync_channel(256);
+    let outer_tunnel = ClientTunnel::new(outer_tx, outer_rx);
     
     reactor.oneshot(move || {
-        // Create a new Tokio TcpStream from the Mio socket
         let socket = match TcpStream::connect(&addr) {
             Ok(s) => s,
             Err(_) => unimplemented!(),
@@ -141,12 +140,12 @@ pub fn connect<T>(reactor: &ReactorHandle, addr: SocketAddr, new_task: T)
             Err(_) => unimplemented!(),
         };
 
-        let inner_rx = match tokReceiver::watch(inner_rx) {
+        let inner_rx = match TokioReceiver::watch(inner_rx) {
             Ok(r) => r,
             Err(_) => unimplemented!(),
         };
 
-        let inner_tunnel = (inner_tx, inner_rx);
+        let inner_tunnel = ClientTunnel::new(inner_tx, inner_rx);
 
         let task = match new_task.new_task(socket, timer, inner_tunnel) {
             Ok(d) => d,

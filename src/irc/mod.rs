@@ -5,6 +5,7 @@ mod command_parser;
 mod command_builder;
 mod user_command;
 mod command;
+mod tunnel;
 
 pub use super::tokio;
 pub use self::user_command::UserCommand;
@@ -12,6 +13,7 @@ pub use self::command_parser::CommandParser;
 pub use self::command_builder::CommandBuilder;
 pub use self::command::Command;
 pub use self::command_type::CommandType;
+pub use self::tunnel::{ClientTunnel, ClientSender, ClientReceiver};
 use self::tokio::io::{TryWrite, TryRead, Readiness, Transport};
 use self::tokio::proto::pipeline;
 use std::io;
