@@ -26,13 +26,27 @@ impl<S,R> Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Co
     }
 
     pub fn run(&mut self) {
+        let mut tick = 0;
+        let mut size = self.get_size();
         loop {
             loop {
                 match self.tunnel.try_read() {
-                    Ok(Some(m)) => self.message_pane.add_message(m),
+                    Ok(Some(m)) => {
+                        self.message_pane.add_message(m);
+                        //Must redraw text box too as msesage pane overlaps
+                        self.text_input.set_dirty();
+                    },
                     Ok(None) => break,
                     Err(_) => unimplemented!(),
                 }
+            }
+
+            // Force immediate redraw if term changes sizes
+            let new_size = self.get_size();
+            if new_size != size {
+                self.message_pane.set_dirty();
+                self.text_input.set_dirty();
+                size = new_size;
             }
 
             self.message_pane.render(&mut self.stream);
@@ -44,8 +58,13 @@ impl<S,R> Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Co
                 },
                 _ => (),
             }
+
             thread::sleep(Duration::from_millis(16));
         }
+    }
+
+    pub fn get_size(&self) -> (u16, u16) {
+        terminal_size().unwrap()
     }
 }
 
@@ -58,6 +77,7 @@ struct TextInput {
     history: Vec<Vec<u8>>,
     line: Vec<u8>,
     read_buf: VecDeque<u8>,
+    is_dirty: bool,
 }
 
 impl TextInput {
@@ -66,7 +86,12 @@ impl TextInput {
             history: Vec::new(),
             line: Vec::new(),
             read_buf: VecDeque::new(),
+            is_dirty: true,
         }
+    }
+
+    fn set_dirty(&mut self) {
+        self.is_dirty = true;
     }
 
     fn read(&mut self, stream: &mut TermStream) -> Option<UserInput> {
@@ -79,6 +104,7 @@ impl TextInput {
             match self.read_buf.pop_front() {
                 Some(3) => return Some(UserInput::Close),
                 Some(127) => {
+                    self.set_dirty();
                     self.line.pop();
                 },
                 Some(13) => {
@@ -86,13 +112,19 @@ impl TextInput {
                     let mut new_item = Vec::new();
                     new_item.append(&mut self.line);
                     self.history.push(new_item);
+                    self.set_dirty();
                     return Some(UserInput::Text(result));
                 },
                 Some(10) => (),
                 None => (),
-                Some(c) => self.line.push(c),
+                Some(c) => {
+                    self.set_dirty();
+                    self.line.push(c)
+                },
             }
         }
+        
+        if !self.is_dirty { return None; }
 
         let (width, height) = terminal_size().unwrap();
         let spaces = [' ';1000];
@@ -106,6 +138,7 @@ impl TextInput {
                                  cursor::Goto(line_end, height)
                                 ).into_bytes());
         stream.flush();
+        self.is_dirty = false;
 
         None
     }
@@ -115,21 +148,28 @@ impl TextInput {
 
 struct MessagePane {
     messages: Vec<Command>,
+    is_dirty: bool,
 }
 
 impl MessagePane {
     fn new() -> MessagePane {
         MessagePane {
             messages: Vec::new(),
+            is_dirty: true,
         }
     }
 
     fn add_message(&mut self, msg: Command) {
+        self.set_dirty();
         self.messages.push(msg);
     }
 
-    fn render(&self, stream: &mut TermStream) {
+    fn set_dirty(&mut self) {
+        self.is_dirty = true;
+    }
 
+    fn render(&mut self, stream: &mut TermStream) {
+        if !self.is_dirty { return; }
         let mut messages: Vec<Vec<u8>> = Vec::new(); 
         for msg in self.messages.iter().rev() {
             messages.push(msg.to_string().into_bytes());
@@ -194,5 +234,6 @@ impl MessagePane {
                                  cursor::Goto(1,height as u16)
                                 ).into_bytes());
         stream.flush();
+        self.is_dirty = false;
     }
 }
