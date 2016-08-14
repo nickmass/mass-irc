@@ -9,7 +9,6 @@ dist: trusty
 script:
     - cargo build --verbose
     - cargo test --verbose
-    - cargo run -- --help
 before_deploy:
     - cargo build --release
     - cd target/release
