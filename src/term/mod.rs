@@ -1,8 +1,8 @@
 mod stream;
 pub use self::stream::TermStream;
-mod term_buffer;
+mod buffer;
 
-use self::term_buffer::{Point, TermBuffer};
+use self::buffer::{Point, Rect, TermBuffer};
 
 use termion::{color, cursor, terminal_size, clear};
 use irc::{Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
@@ -62,9 +62,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Co
                 _ => (),
             }
 
-            if self.window.is_dirty() ||
-                self.message_pane.is_dirty() ||
-                self.text_input.is_dirty() {
+            if self.window.is_dirty() {
                 self.message_pane.set_dirty();
                 self.text_input.set_dirty();
             }
@@ -158,7 +156,7 @@ impl TextInput {
         let height = window.get_height();
         let width = window.get_width();
 
-        window.draw(buf, Point(0, height), width);
+        window.draw(buf, Rect(Point(0, height), width, height));
        
         self.dirty = false;
     }
@@ -207,7 +205,7 @@ impl MessagePane {
                            width,
                            height,
                            FlowDirection::TopToBottom);
-        window.draw(rendered_msgs, Point(0,0), width);
+        window.draw(rendered_msgs, Rect(Point(0,0), width, height));
         self.dirty = false;
     }
 }

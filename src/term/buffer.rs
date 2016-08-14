@@ -3,7 +3,10 @@ use std::collections::VecDeque;
 use super::TermStream;
 use std::io::Write;
 
+#[derive(Clone, Copy, Debug)]
 pub struct Point(pub u32, pub u32);
+#[derive(Clone, Copy, Debug)]
+pub struct Rect(pub Point, pub u32, pub u32);
 
 pub struct TermBuffer {
     out_buf: Vec<Vec<u8>>,
@@ -61,17 +64,34 @@ impl TermBuffer {
         self.out_buf = lines;
     }
 
+    fn clear_region(&mut self, rect: Rect) {
+        let height = rect.2;
+        let width = rect.1;
+
+        for x in (rect.0).0 .. (rect.0).0 + width {
+            for y in (rect.0).1 .. (rect.0).1 + height {
+                self.draw_char(b' ', x, y);
+            }
+        }
+        
+    }
+
     fn draw_char(&mut self, val: u8, x: u32, y: u32) {
         if y <= self.height && x < self.width {
             self.out_buf[y as usize][x as usize] = val;
         }
     }
 
-    pub fn draw(&mut self, input: Vec<Vec<u8>>, position: Point, width: u32) {
+    pub fn draw(&mut self, input: Vec<Vec<u8>>, rect: Rect) {
         self.set_dirty();
 
-        let x = position.0;
-        let mut y = position.1;
+        let x = (rect.0).0;
+        let mut y = (rect.0).1;
+        let width = rect.1;
+        let height = rect.2;
+        
+        self.clear_region(rect);
+        
         for line in input {
             let mut x = x;
             for c in line {
@@ -97,7 +117,6 @@ impl TermBuffer {
                                 ).into_bytes());
         
         stream.flush();
-        self.clear_buf();
         self.dirty = false;
     }
 }
