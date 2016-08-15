@@ -37,7 +37,8 @@ impl TermStream {
 
 impl Drop for TermStream {
     fn drop(&mut self) {
-        println!("\n");
+        let _ = self.write(b"\n");
+        let _ = self.flush();
     }
 }
 

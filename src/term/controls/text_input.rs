@@ -48,17 +48,17 @@ impl TextInput {
                 escape_ready = false;
                 match c {
                     Some(b'A') => { //Up
-                        self.set_dirty();
                         if self.history_index + 1 < self.history.len() {
                             self.set_dirty();
                             self.history_index += 1;
+                            self.cursor = self.history[self.history_index].len() as u32;
                         }
                     },
                     Some(b'B') => { //Down
-                        self.set_dirty();
                         if self.history_index > 0 {
                             self.set_dirty();
                             self.history_index -= 1;
+                            self.cursor = self.history[self.history_index].len() as u32;
                         }
 
                     },
@@ -198,8 +198,8 @@ impl TextInput {
     pub fn render(&mut self, window: &mut TermBuffer) {
         if !self.is_dirty() { return; }
 
-        let height = window.get_height();
-        let width = window.get_width();
+        let height = window.height();
+        let width = window.width();
 
         let line =  self.current_line();
 
@@ -208,10 +208,7 @@ impl TextInput {
         let mut buf = line[offset as usize ..].as_bytes().to_vec();
         buf.truncate(width as usize);
 
-        let mut line_buf = Vec::new();
-        line_buf.push(buf);
-
-        window.draw(line_buf, Rect(Point(0, height), width, height));
+        window.draw(buf, Rect(Point(0, height - 1), width, height));
        
         self.dirty = false;
     }
@@ -225,14 +222,14 @@ impl TextInput {
     }
 
     pub fn get_display_cursor(&self, window: &TermBuffer) -> u32 {
-        let width = window.get_width();
+        let width = window.width();
         self.cursor - self.get_render_offset(width)
     }
 
     pub fn set_cursor(&mut self, stream: &mut TermStream, window: &TermBuffer) {
         let _ = stream.write_all(&*format!("{}",
                     cursor::Goto(self.get_display_cursor(window) as u16 + 1,
-                    window.get_height() as u16)).into_bytes());
+                    window.height() as u16)).into_bytes());
         let _ = stream.flush();
     }
 }

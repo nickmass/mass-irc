@@ -32,14 +32,14 @@ impl MessagePane {
             messages.push_str(&*msg.clone().to_string());
         }
         
-        let height = window.get_height();
-        let width = window.get_width();
+        let height = window.height();
+        let width = window.width();
 
         let rendered_msgs = TextWindow::render(&*messages,
                            width,
-                           height,
+                           height - 1,
                            FlowDirection::BottomToTop);
-        window.draw(rendered_msgs, Rect(Point(0,0), width, height));
+        window.draw(rendered_msgs, Rect(Point(0,0), width, height - 1));
         self.dirty = false;
     }
 }
@@ -52,7 +52,7 @@ pub enum FlowDirection {
 pub struct TextWindow {}
 
 impl TextWindow {
-    pub fn render(text: &str, width: u32, height: u32, dir: FlowDirection) -> Vec<Vec<u8>> {
+    pub fn render(text: &str, width: u32, height: u32, dir: FlowDirection) -> Vec<u8> {
         let mut wrapped_buf = String::new();
         let mut lines = 0;
         for line in text.lines() {
@@ -76,7 +76,7 @@ impl TextWindow {
         }
 
         match dir {
-            FlowDirection::BottomToTop => {
+            FlowDirection::TopToBottom => {
                 let mut wrapped_lines: Vec<String> = wrapped_buf.lines().map(String::from).rev().collect();
                 while lines < height {
                     wrapped_lines.push(String::new());
@@ -85,14 +85,16 @@ impl TextWindow {
 
                 let mut flipped_buf = VecDeque::new();
                 for line in wrapped_lines.drain(0..height as usize) {
-                    flipped_buf.push_front(line.into_bytes());
+                    let len = line.len() as u32;
+                    flipped_buf.extend(line.into_bytes());
+                    for _ in len..width { flipped_buf.push_back(b' ') }
                     lines -= 1;
                     if lines == 0 { break; }
                 }
 
                 flipped_buf.into()
             },
-            FlowDirection::TopToBottom => {
+            FlowDirection::BottomToTop => {
                 while lines < height {
                     wrapped_buf.push('\n');
                     lines += 1;
@@ -102,8 +104,10 @@ impl TextWindow {
 
                 let mut buf = Vec::new();
                 let total_lines = wrapped_lines.len();
-                for line in wrapped_lines.drain(total_lines - height as usize .. total_lines) {
-                    buf.push(line.into_bytes());
+                for line in &mut wrapped_lines.drain(total_lines - height as usize .. total_lines) {
+                    let len = line.len() as u32;
+                    buf.append(&mut line.into_bytes());
+                    for _ in len..width { buf.push(b' ') }
                     lines -= 1;
                     if lines == 0 { break; }
                 }
