@@ -11,16 +11,16 @@ use std::thread;
 use std::time::Duration;
 use std::io::Write;
 
-pub struct Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Command> {
-    tunnel: ClientTunnel<S, R, UserCommand, Command>,
+pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
+    tunnel: ClientTunnel<S, R>,
     stream: TermStream,
     window: TermBuffer,
     message_pane: MessagePane,
     text_input: TextInput,
 }
 
-impl<S,R> Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Command> {
-    pub fn new(tunnel: ClientTunnel<S, R, UserCommand, Command>) -> Terminal<S,R> {
+impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=Command> {
+    pub fn new(tunnel: ClientTunnel<S, R>) -> Terminal<S,R> {
         let size  = terminal_size().unwrap();
         Terminal {
             tunnel: tunnel,

@@ -3,43 +3,40 @@ use super::super::mio::channel as mio;
 use std::sync::mpsc::*;
 use std::marker::PhantomData;
 
-pub struct ClientTunnel<S, R, O, I> where S: ClientSender<O>, R: ClientReceiver<I> {
+pub struct ClientTunnel<S, R> where S: ClientSender, R: ClientReceiver {
     sender: S,
     receiver: R,
-    _phantom_out: PhantomData<O>,
-    _phantom_in: PhantomData<I>,
-    
 }
 
-impl<S, R, O, I> ClientTunnel<S, R, O, I>
-        where S: ClientSender<O>, R: ClientReceiver<I> {
-    pub fn new(sender: S, receiver: R) -> ClientTunnel<S, R, O, I> {
+impl<S, R> ClientTunnel<S, R>
+        where S: ClientSender, R: ClientReceiver {
+    pub fn new(sender: S, receiver: R) -> ClientTunnel<S, R> {
         ClientTunnel {
             sender: sender,
             receiver: receiver,
-            _phantom_out: PhantomData,
-            _phantom_in: PhantomData,
         }
     }
 
-    pub fn try_read(&self) -> Result<Option<I>, TryRecvError> {
+    pub fn try_read(&self) -> Result<Option<R::Msg>, TryRecvError> {
         self.receiver.try_read()
     }
 
-    pub fn write(&self, t: O) -> Result<(), SendError<O>> {
+    pub fn write(&self, t: S::Msg) -> Result<(), SendError<S::Msg>> {
         self.sender.write(t)
     }
 
-    pub fn try_write(&self, t:O) -> Result<(), TrySendError<O>> {
+    pub fn try_write(&self, t: S::Msg) -> Result<(), TrySendError<S::Msg>> {
         self.sender.try_write(t)
     }
 }
 
-pub trait ClientReceiver<T> {
-    fn try_read(&self) -> Result<Option<T>, TryRecvError>;
+pub trait ClientReceiver {
+    type Msg;
+    fn try_read(&self) -> Result<Option<Self::Msg>, TryRecvError>;
 }
 
-impl<T> ClientReceiver<T> for tokio::Receiver<T> {
+impl<T> ClientReceiver for tokio::Receiver<T> {
+    type Msg = T;
     fn try_read(&self) -> Result<Option<T>, TryRecvError> {
         match self.recv() {
             Ok(x) => Ok(x),
@@ -48,7 +45,8 @@ impl<T> ClientReceiver<T> for tokio::Receiver<T> {
     }
 }
 
-impl<T> ClientReceiver<T> for Receiver<T> {
+impl<T> ClientReceiver for Receiver<T> {
+    type Msg = T;
     fn try_read(&self) -> Result<Option<T>, TryRecvError> {
         match self.try_recv() {
             Ok(x) => Ok(Some(x)),
@@ -58,13 +56,15 @@ impl<T> ClientReceiver<T> for Receiver<T> {
     }
 }
 
-pub trait ClientSender<T> {
-    fn write(&self, t: T) -> Result<(), SendError<T>>;
+pub trait ClientSender {
+    type Msg;
+    fn write(&self, t: Self::Msg) -> Result<(), SendError<Self::Msg>>;
 
-    fn try_write(&self, t:T) -> Result<(), TrySendError<T>>;
+    fn try_write(&self, t:Self::Msg) -> Result<(), TrySendError<Self::Msg>>;
 }
 
-impl<T> ClientSender<T> for mio::SyncSender<T> {
+impl<T> ClientSender for mio::SyncSender<T> {
+    type Msg = T;
     fn write(&self, t: T) -> Result<(), SendError<T>> {
         match self.send(t) {
             Ok(_) => Ok(()),
@@ -83,7 +83,8 @@ impl<T> ClientSender<T> for mio::SyncSender<T> {
     }
 }
 
-impl<T> ClientSender<T> for SyncSender<T> {
+impl<T> ClientSender for SyncSender<T> {
+    type Msg = T;
     fn write(&self, t: T) -> Result<(), SendError<T>> {
         match self.send(t) {
             Ok(_) => Ok(()),

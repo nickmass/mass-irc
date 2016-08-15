@@ -119,8 +119,8 @@ impl Task for ClientTask {
     }
 }
 
-pub type OuterTunnel = ClientTunnel<MioSyncSender<UserCommand>, Receiver<Command>, UserCommand, Command>;
-pub type InnerTunnel = ClientTunnel<SyncSender<Command>, TokioReceiver<UserCommand>, Command, UserCommand>;
+pub type OuterTunnel = ClientTunnel<MioSyncSender<UserCommand>, Receiver<Command>>;
+pub type InnerTunnel = ClientTunnel<SyncSender<Command>, TokioReceiver<UserCommand>>;
 
 pub fn connect<T>(reactor: &ReactorHandle, addr: SocketAddr, new_task: T)
     -> OuterTunnel where T: NewTermTask
