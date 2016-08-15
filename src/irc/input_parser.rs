@@ -49,6 +49,9 @@ impl UserInputParser {
             "/whois" => {
                 UserCommand::WhoIs(parts.1.to_string())
             },
+            "/quit" => {
+                UserCommand::Quit(parts.1.to_string())
+            },
             _ => {
                 println!("{:?}", parts);
                 return Err(ParseError::InvalidCommand);
