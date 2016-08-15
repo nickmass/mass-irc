@@ -8,6 +8,24 @@ pub struct Point(pub u32, pub u32);
 #[derive(Clone, Copy, Debug)]
 pub struct Rect(pub Point, pub u32, pub u32);
 
+impl Rect {
+    pub fn left(&self) -> u32 {
+        (self.0).0
+    }
+
+    pub fn right(&self) -> u32 {
+        (self.0).0 + self.1
+    }
+
+    pub fn top(&self) -> u32 {
+        (self.0).1
+    }
+
+    pub fn bottom(&self) -> u32 {
+        (self.0).1 + self.2
+    }
+}
+
 pub struct TermBuffer {
     out_buf: Vec<Vec<u8>>,
     width: u32,
@@ -95,9 +113,14 @@ impl TermBuffer {
         for line in input {
             let mut x = x;
             for c in line {
-                self.draw_char(c, x, y);
-                x += 1;
+                if x < rect.right() {
+                    self.draw_char(c, x, y);
+                    x += 1;
+                } else {
+                    break;
+                }
             }
+            if y >= rect.bottom() { break; }
             y += 1;
         }
     }
