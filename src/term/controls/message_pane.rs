@@ -1,6 +1,5 @@
 use irc::Command;
-use term::{TermBuffer, Point, Rect};
-use std::collections::VecDeque;
+use term::{TermBuffer, Surface, Point, Rect};
 
 pub struct MessagePane {
     messages: Vec<Command>,
@@ -39,7 +38,7 @@ impl MessagePane {
                            width,
                            height - 1,
                            FlowDirection::BottomToTop);
-        window.draw(rendered_msgs, Rect(Point(0,0), width, height - 1));
+        window.blit(&rendered_msgs, Point(0,0));
         self.dirty = false;
     }
 }
@@ -52,7 +51,8 @@ pub enum FlowDirection {
 pub struct TextWindow {}
 
 impl TextWindow {
-    pub fn render(text: &str, width: u32, height: u32, dir: FlowDirection) -> Vec<u8> {
+    pub fn render(text: &str, width: u32, height: u32, dir: FlowDirection) -> Surface {
+        let mut surface = Surface::new(Rect(Point(0,0), width, height));
         let mut wrapped_buf = String::new();
         let mut lines = 0;
         for line in text.lines() {
@@ -75,46 +75,28 @@ impl TextWindow {
             }
         }
 
+        let skip = if lines > height { lines - height } else { 0 };
+        let mut wrapped_lines = wrapped_buf.lines().skip(skip as usize);
+
         match dir {
             FlowDirection::TopToBottom => {
-                let mut wrapped_lines: Vec<String> = wrapped_buf.lines().map(String::from).rev().collect();
-                while lines < height {
-                    wrapped_lines.push(String::new());
-                    lines += 1;
+                let mut ind = 0;
+                while ind < height && ind < lines {
+                    surface.text(wrapped_lines.next().unwrap(),
+                        Point(0, ind));
+                    ind += 1;
                 }
-
-                let mut flipped_buf = VecDeque::new();
-                for line in wrapped_lines.drain(0..height as usize) {
-                    let len = line.len() as u32;
-                    flipped_buf.extend(line.into_bytes());
-                    for _ in len..width { flipped_buf.push_back(b' ') }
-                    lines -= 1;
-                    if lines == 0 { break; }
-                }
-
-                flipped_buf.into()
             },
             FlowDirection::BottomToTop => {
-                while lines < height {
-                    wrapped_buf.push('\n');
-                    lines += 1;
+                let mut ind = if height > lines { height - lines } else { 0 };
+                while ind < height {
+                    surface.text(wrapped_lines.next().unwrap(),
+                        Point(0, ind));
+                    ind += 1;
                 }
-                
-                let mut wrapped_lines: Vec<String> = wrapped_buf.lines().map(String::from).collect();
-
-                let mut buf = Vec::new();
-                let total_lines = wrapped_lines.len();
-                for line in &mut wrapped_lines.drain(total_lines - height as usize .. total_lines) {
-                    let len = line.len() as u32;
-                    buf.append(&mut line.into_bytes());
-                    for _ in len..width { buf.push(b' ') }
-                    lines -= 1;
-                    if lines == 0 { break; }
-                }
-
-                buf
             }
         }
+        surface
     }
 }
 

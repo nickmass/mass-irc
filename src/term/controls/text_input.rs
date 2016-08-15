@@ -1,4 +1,4 @@
-use term::{TermStream, TermBuffer, UserInput, Point, Rect};
+use term::{Color, Surface, TermStream, TermBuffer, UserInput, Point, Rect};
 use termion::cursor;
 
 use std::io::Write;
@@ -201,14 +201,16 @@ impl TextInput {
         let height = window.height();
         let width = window.width();
 
+        let mut surface = Surface::new(Rect(Point(0,0), width, 1));
         let line =  self.current_line();
 
-        let offset = self.get_render_offset(width);
+        let offset = self.get_render_offset(width) as usize;
+        let mut end = offset + width as usize;
+        if end > line.len() { end = line.len(); }
 
-        let mut buf = line[offset as usize ..].as_bytes().to_vec();
-        buf.truncate(width as usize);
-
-        window.draw(buf, Rect(Point(0, height - 1), width, height));
+        surface.text(&line[offset..end], Point(0,0));
+        surface.set_color(Point(0,0), Some(Color::LightBlack), Some(Color::LightWhite)); 
+        window.blit(&surface, Point(0, height - 1));
        
         self.dirty = false;
     }

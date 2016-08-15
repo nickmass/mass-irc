@@ -1,7 +1,7 @@
 mod stream;
 pub use self::stream::TermStream;
 mod buffer;
-pub use self::buffer::{Point, Rect, TermBuffer};
+pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
 mod controls;
 pub use self::controls::{MessagePane, TextInput};
 
