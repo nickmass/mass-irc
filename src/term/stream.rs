@@ -1,8 +1,8 @@
-use super::super::mio::{would_block};
-use super::super::termion::input::{TermRead};
-use super::super::termion::raw::{IntoRawMode, RawTerminal};
-use super::super::termion::{async_stdin, AsyncReader};
-use super::super::tokio::io::Readiness;
+use mio::{would_block};
+use termion::input::{TermRead};
+use termion::raw::{IntoRawMode, RawTerminal};
+use termion::{async_stdin, AsyncReader};
+use tokio::io::Readiness;
 use std::io::{Read, Write, Result, Stdout, stdout};
 
 pub struct TermStream {
@@ -32,6 +32,12 @@ impl TermStream {
         }
 
         self.out_stream.write(buf)
+    }
+}
+
+impl Drop for TermStream {
+    fn drop(&mut self) {
+        println!("\n");
     }
 }
 

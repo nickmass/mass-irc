@@ -1,4 +1,4 @@
-use super::{Command,CommandType as CT,CommandBuilder};
+use irc::{Command,CommandType as CT,CommandBuilder};
 
 pub enum UserCommand {
     Nick(String),

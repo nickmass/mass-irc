@@ -1,20 +1,19 @@
-use super::super::mio::timer::Builder;
+use mio::timer::Builder;
+use mio::channel::{sync_channel as mio_sync_channel, SyncSender as MioSyncSender};
 
-use super::{Irc, Command, UserCommand, CommandType, CommandBuilder, ClientTunnel};
+use irc::{Irc, Command, UserCommand, CommandType, CommandBuilder, ClientTunnel};
 
-use super::super::mio::channel::{sync_channel as mio_sync_channel, SyncSender as MioSyncSender};
+use tokio::util::channel::Receiver as TokioReceiver;
+use tokio::util::timer::Timer;
+use tokio::tcp::TcpStream;
+use tokio::reactor;
+use tokio::reactor::*;
+use tokio::io::Transport;
+use tokio::proto::pipeline::Frame;
+
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-
-use super::tokio::util::channel::Receiver as TokioReceiver;
-use super::tokio::util::timer::Timer;
-use super::tokio::tcp::TcpStream;
-use super::tokio::reactor;
-use super::tokio::reactor::*;
-use super::tokio::io::Transport;
-use super::tokio::proto::pipeline::Frame;
-
-use std::io;
 use std::net::SocketAddr;
+use std::io;
 
 pub struct Client {
     reactor: Option<ReactorHandle>,
@@ -93,10 +92,10 @@ impl Task for ClientTask {
                                     .command(CommandType::Pong)
                                     .add_param(msg.params.data[0].clone())
                                     .build().unwrap();
-                                self.tunnel.try_write(msg);
-                                self.tunnel.try_write(pong);
+                                let _ = self.tunnel.try_write(msg);
+                                let _ = self.tunnel.try_write(pong);
                             },
-                            _ => { self.tunnel.try_write(msg); }
+                            _ => { let _ = self.tunnel.try_write(msg); }
 
                         }
                     }

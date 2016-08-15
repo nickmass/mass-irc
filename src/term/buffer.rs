@@ -1,6 +1,5 @@
-use super::super::termion::{color, cursor};
-use std::collections::VecDeque;
-use super::TermStream;
+use termion::{color, cursor, terminal_size};
+use term::TermStream;
 use std::io::Write;
 
 #[derive(Clone, Copy, Debug)]
@@ -34,15 +33,15 @@ pub struct TermBuffer {
 }
 
 impl TermBuffer {
-    pub fn new(width: u32, height: u32) -> TermBuffer {
+    pub fn new() -> TermBuffer {
         let mut buf = TermBuffer {
             out_buf: Vec::new(),
-            width: width,
-            height: height,
+            width: 0,
+            height: 0,
             dirty: true,
         };
 
-        buf.clear();
+        buf.init();
 
         buf
     }
@@ -53,10 +52,15 @@ impl TermBuffer {
     pub fn get_height(&self) -> u32 { self.height }
     pub fn get_width(&self) -> u32 { self.width }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
-        self.clear();
+    fn init(&mut self) {
+        let size  = terminal_size().unwrap();
+        let width = size.0 as u32;
+        let height = size.1 as u32;
+        if width != self.width || height != self.height {
+            self.width = width;
+            self.height = height;
+            self.clear();
+        }
     }
 
     pub fn clear(&mut self) {
@@ -66,7 +70,7 @@ impl TermBuffer {
 
     fn clear_buf(&mut self) {
         let mut line = Vec::with_capacity(self.width as usize + 2);
-        for i in 0..self.width{
+        for _ in 0..self.width{
             line.push(b' ');
         }
         let last_line = line.clone();
@@ -74,7 +78,7 @@ impl TermBuffer {
         line.push(b'\n');
 
         let mut lines = Vec::with_capacity(self.height as usize);
-        for i in 0..self.height {
+        for _ in 0..self.height {
             lines.push(line.clone());
         }
 
@@ -83,11 +87,8 @@ impl TermBuffer {
     }
 
     fn clear_region(&mut self, rect: Rect) {
-        let height = rect.2;
-        let width = rect.1;
-
-        for x in (rect.0).0 .. (rect.0).0 + width {
-            for y in (rect.0).1 .. (rect.0).1 + height {
+        for x in rect.left() .. rect.right() {
+            for y in rect.top() .. rect.bottom() {
                 self.draw_char(b' ', x, y);
             }
         }
@@ -103,10 +104,8 @@ impl TermBuffer {
     pub fn draw(&mut self, input: Vec<Vec<u8>>, rect: Rect) {
         self.set_dirty();
 
-        let x = (rect.0).0;
-        let mut y = (rect.0).1;
-        let width = rect.1;
-        let height = rect.2;
+        let x = rect.left();
+        let mut y = rect.top();
         
         self.clear_region(rect);
         
@@ -126,6 +125,7 @@ impl TermBuffer {
     }
 
     pub fn render(&mut self, stream: &mut TermStream) {
+        self.init();
         if !self.is_dirty() { return; }
 
         let mut write_buf = Vec::new();
@@ -133,13 +133,13 @@ impl TermBuffer {
             write_buf.append(&mut line.clone());
         }
 
-        stream.write_all(&*format!("{}{}{}",
+        let _ = stream.write_all(&*format!("{}{}{}",
                                  cursor::Goto(1,1),
                                  color::Fg(color::White),
                                  String::from_utf8(write_buf).unwrap(),
                                 ).into_bytes());
         
-        stream.flush();
+        let _ = stream.flush();
         self.dirty = false;
     }
 }

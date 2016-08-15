@@ -1,6 +1,6 @@
 use std::str;
-use super::{CommandType};
-use super::command::*;
+use irc::{CommandType};
+use irc::command::*;
 
 pub struct CommandParser {
 }

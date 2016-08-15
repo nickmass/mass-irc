@@ -1,7 +1,6 @@
-use super::tokio::util::channel as tokio;
-use super::super::mio::channel as mio;
+use tokio::util::channel as tokio;
+use mio::channel as mio;
 use std::sync::mpsc::*;
-use std::marker::PhantomData;
 
 pub struct ClientTunnel<S, R> where S: ClientSender, R: ClientReceiver {
     sender: S,

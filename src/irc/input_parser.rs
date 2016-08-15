@@ -1,4 +1,4 @@
-use super::UserCommand;
+use irc::UserCommand;
 
 pub enum ParseError {
     InputRequired,
