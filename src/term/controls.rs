@@ -267,7 +267,7 @@ impl MessagePane {
         let rendered_msgs = TextWindow::render(&*messages,
                            width,
                            height,
-                           FlowDirection::TopToBottom);
+                           FlowDirection::BottomToTop);
         window.draw(rendered_msgs, Rect(Point(0,0), width, height));
         self.dirty = false;
     }
