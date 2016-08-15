@@ -2,8 +2,10 @@ mod stream;
 pub use self::stream::TermStream;
 mod buffer;
 pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
-mod controls;
-pub use self::controls::{MessagePane, TextInput};
+pub mod controls;
+use self::controls::{MessagePane, TextInput};
+mod keys;
+pub use self::keys::{Key, KeyReader};
 
 use irc::{UserInputParser, Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
