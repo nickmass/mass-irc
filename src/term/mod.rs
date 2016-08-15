@@ -6,7 +6,7 @@ mod controls;
 pub use self::controls::{MessagePane, TextInput, UserInput};
 
 use termion::{color, cursor, terminal_size, clear};
-use irc::{Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
+use irc::{UserInputParser, Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
 use std::time::Duration;
 use std::io::Write;
@@ -56,8 +56,10 @@ impl<S,R> Terminal<S,R> where S: ClientSender<UserCommand>, R: ClientReceiver<Co
             match self.text_input.read(&mut self.stream) {
                 Some(UserInput::Close) => break,
                 Some(UserInput::Text(s)) => {
-                    let msg = UserCommand::Nick(s);
-                    self.tunnel.write(msg);
+                    match UserInputParser::parse(s) {
+                        Ok(msg) => { self.tunnel.write(msg); },
+                        Err(_) =>{ unimplemented!(); },
+                    }
                 },
                 _ => (),
             }
