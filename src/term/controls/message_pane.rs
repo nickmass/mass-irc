@@ -1,5 +1,5 @@
 use irc::Command;
-use term::{TermBuffer, Surface, Point, Rect};
+use term::{TermBuffer, Color, Surface, Point, Rect};
 
 pub struct MessagePane {
     messages: Vec<Command>,
@@ -36,9 +36,10 @@ impl MessagePane {
 
         let rendered_msgs = TextWindow::render(&*messages,
                            width,
-                           height - 1,
+                           height - 3,
                            FlowDirection::BottomToTop);
-        window.blit(&rendered_msgs, Point(0,0));
+        window.blit(&rendered_msgs, Point(0,2));
+
         self.dirty = false;
     }
 }
@@ -96,6 +97,7 @@ impl TextWindow {
                 }
             }
         }
+        surface.set_color(Point(0,0), Some(Color::White), Some(Color::Black));
         surface
     }
 }

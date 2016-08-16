@@ -3,7 +3,7 @@ pub use self::stream::TermStream;
 mod buffer;
 pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
 pub mod controls;
-use self::controls::{MessagePane, TextInput};
+use self::controls::{MessagePane, TextInput, TabBar, TabStatus};
 mod keys;
 pub use self::keys::{Key, KeyReader};
 
@@ -22,17 +22,27 @@ pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
     window: TermBuffer,
     message_pane: MessagePane,
     text_input: TextInput,
+    tab_bar: TabBar,
 }
 
 impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=Command> {
     pub fn new(tunnel: ClientTunnel<S, R>) -> Terminal<S,R> {
-        Terminal {
+        let mut term = Terminal {
             tunnel: tunnel,
             stream: TermStream::new().unwrap(),
             window: TermBuffer::new(),
             message_pane: MessagePane::new(),
             text_input: TextInput::new(),
-        }
+            tab_bar: TabBar::new(),
+        };
+        
+        term.tab_bar.add_tab("localhost".to_string(), "Connected...".to_string(), TabStatus::Read);
+        term.tab_bar.add_tab("mass-irc".to_string(), "".to_string(), TabStatus::Alert);
+        term.tab_bar.add_tab("NickMass".to_string(), "Talking all about NickMass!!".to_string(), TabStatus::Active);
+        term.tab_bar.add_tab("programming".to_string(), "".to_string(), TabStatus::Unread);
+
+        term
+
     }
 
     pub fn run(&mut self) {
@@ -61,12 +71,13 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             if self.window.is_dirty() {
                 self.message_pane.set_dirty();
                 self.text_input.set_dirty();
+                self.tab_bar.set_dirty();
             }
 
             self.message_pane.render(&mut self.window);
             self.text_input.render(&mut self.window);
+            self.tab_bar.render(&mut self.window);
             self.window.render(&mut self.stream);
- 
             self.text_input.set_cursor(&mut self.stream, &self.window);
 
             thread::sleep(Duration::from_millis(16));

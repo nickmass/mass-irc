@@ -13,10 +13,6 @@ pub struct TextInput {
 }
 
 impl TextInput {
-    fn is_printable(c: u8) -> bool {
-        c >= 32 && c <= 127
-    }
-
     pub fn new() -> TextInput {
         let mut input = TextInput {
             history_index: 0,

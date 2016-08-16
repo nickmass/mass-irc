@@ -5,4 +5,4 @@ mod text_input;
 pub use self::text_input::TextInput;
 
 mod tabs;
-pub use self::tabs::TabBar;
+pub use self::tabs::{TabBar, TabStatus, TabToken};

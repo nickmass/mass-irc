@@ -288,7 +288,6 @@ impl TermBuffer {
     }
 
     pub fn render(&mut self, stream: &mut TermStream) {
-        self.init();
         if !self.is_dirty() { return; }
 
         let mut buf = String::new();
@@ -301,5 +300,6 @@ impl TermBuffer {
         
         let _ = stream.flush();
         self.dirty = false;
+        self.init();
     }
 }
