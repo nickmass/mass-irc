@@ -9,6 +9,8 @@ pub enum UserCommand {
     Away(String),
     Part(String),
     Quit(String),
+    GetTopic(String),
+    SetTopic(String, String),
 }
 
 impl UserCommand {
@@ -43,6 +45,13 @@ impl UserCommand {
             UserCommand::Quit(msg) => Ok(b.command(CT::Quit)
                                        .add_param(msg)
                                        .build().unwrap()),
+            UserCommand::GetTopic(chan) => Ok(b.command(CT::Topic)
+                                            .add_param(chan)
+                                            .build().unwrap()),
+            UserCommand::SetTopic(chan, topic) => Ok(b.command(CT::Topic)
+                                                     .add_param(chan)
+                                                     .add_param(topic)
+                                                     .build().unwrap()),
         }
 
     }

@@ -100,4 +100,8 @@ impl Command {
                             cmd,
                             self.params.to_cmd())
     }
+
+    pub fn get_param(&self, index: usize) -> Option<&str> {
+        self.params.data.get(index).map(|x| &**x)
+    }
 }

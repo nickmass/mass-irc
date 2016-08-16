@@ -1,7 +1,7 @@
 use mio::timer::Builder;
 use mio::channel::{sync_channel as mio_sync_channel, SyncSender as MioSyncSender};
 
-use irc::{Irc, Command, UserCommand, CommandType, CommandBuilder, ClientTunnel};
+use irc::{Irc, Command, UserCommand, CommandType, ClientEvent, CommandBuilder, ClientTunnel};
 
 use tokio::util::channel::Receiver as TokioReceiver;
 use tokio::util::timer::Timer;
@@ -87,16 +87,13 @@ impl Task for ClientTask {
                                     .add_param(msg.params.data[0].clone())
                                     .build().unwrap();
                                 try!(self.server.write(Frame::Message(pong)));
-                                let pong =
-                                    CommandBuilder::new()
-                                    .command(CommandType::Pong)
-                                    .add_param(msg.params.data[0].clone())
-                                    .build().unwrap();
-                                let _ = self.tunnel.try_write(msg);
-                                let _ = self.tunnel.try_write(pong);
                             },
-                            _ => { let _ = self.tunnel.try_write(msg); }
+                            _ => {  }
 
+                        }
+                        match ClientEvent::from_command(&msg) {
+                            Some(ev) => { let _ = self.tunnel.try_write(ev); },
+                            _ => { self.tunnel.try_write(ClientEvent::Command(msg)); },
                         }
                     }
                 },
@@ -108,6 +105,15 @@ impl Task for ClientTask {
         match self.tunnel.try_read() {
             Ok(Some(d)) => {
                 let command = d.to_command().unwrap();
+                match command.command {
+                    CommandType::PrivMsg => {
+                        match ClientEvent::from_command(&command) {
+                            Some(ev) => { let _ = self.tunnel.try_write(ev); },
+                            _ => {},
+                        }
+                    }
+                    _ => {},
+                }
                 try!(self.server.write(Frame::Message(command)));
             },
             _ => (),
@@ -118,8 +124,8 @@ impl Task for ClientTask {
     }
 }
 
-pub type OuterTunnel = ClientTunnel<MioSyncSender<UserCommand>, Receiver<Command>>;
-pub type InnerTunnel = ClientTunnel<SyncSender<Command>, TokioReceiver<UserCommand>>;
+pub type OuterTunnel = ClientTunnel<MioSyncSender<UserCommand>, Receiver<ClientEvent>>;
+pub type InnerTunnel = ClientTunnel<SyncSender<ClientEvent>, TokioReceiver<UserCommand>>;
 
 pub fn connect<T>(reactor: &ReactorHandle, addr: SocketAddr, new_task: T)
     -> OuterTunnel where T: NewTermTask
