@@ -7,7 +7,7 @@ pub use self::controls::{MessagePane, TextInput, TabBar, TabStatus, TabToken};
 mod keys;
 pub use self::keys::{Modifier, Key, KeyReader};
 
-use irc::{CommandType, CommandBuilder, ClientEvent, UserInputParser, Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
+use irc::{ClientEvent, UserInputParser, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
 use std::time::Duration;
 use std::collections::HashMap;
