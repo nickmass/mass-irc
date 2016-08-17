@@ -122,8 +122,9 @@ impl TabBar {
     pub fn remove_tab(&mut self, token: TabToken) {
         let tab_index = self.tabs.iter().position(|x| x.token == token);
         if let Some(tab_index) = tab_index {
+            let status = self.tabs[tab_index].get_status();
             self.tabs.retain(|x| x.token != token);
-            if self.tabs[tab_index].get_status() == TabStatus::Active {
+            if status == TabStatus::Active {
                 if tab_index < self.tabs.len() {
                     self.tabs[tab_index].set_status(TabStatus::Active);
                 } else if tab_index != 0 {

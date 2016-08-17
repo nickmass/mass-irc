@@ -1,8 +1,8 @@
 use irc::Command;
-use term::{TermBuffer, Color, Surface, Point, Rect};
+use term::{TabToken, TermBuffer, Color, Surface, Point, Rect};
 
 pub struct MessagePane {
-    messages: Vec<Command>,
+    messages: Vec<(Option<TabToken>, String)>,
     dirty: bool,
 }
 
@@ -18,17 +18,18 @@ impl MessagePane {
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 
-    pub fn add_message(&mut self, msg: Command) {
+    pub fn add_message(&mut self, tab: Option<TabToken>, msg: String) {
         self.set_dirty();
-        self.messages.push(msg);
+        self.messages.push((tab, msg));
     }
 
-    pub fn render(&mut self, window: &mut TermBuffer) {
+    pub fn render(&mut self, window: &mut TermBuffer, tab: Option<TabToken>) {
         if ! self.is_dirty() { return }
 
         let mut messages = String::new(); 
-        for msg in &self.messages {
-            messages.push_str(&*msg.clone().to_string());
+        let tab_messages = self.messages.iter().filter(|x| x.0 == tab);
+        for msg in tab_messages {
+            messages.push_str(&msg.1);
         }
         
         let height = window.height();

@@ -1,11 +1,11 @@
 use irc::{Sender, Command, CommandType};
 
 pub enum ClientEvent {
-    ChannelMessage(String, String, String),
-    PrivateMessage(String, String),
-    JoinChannel(String, String),
-    LeaveChannel(String, String),
-    NoticeMessage(String, String, String),
+    ChannelMessage(String, Option<String>, String),
+    PrivateMessage(Option<String>, String),
+    JoinChannel(String, Option<String>),
+    LeaveChannel(String, Option<String>),
+    NoticeMessage(String, Option<String>, String),
     Topic(String, String),
     Command(Command),
 }
@@ -13,12 +13,10 @@ pub enum ClientEvent {
 impl ClientEvent {
     pub fn from_command(command: &Command) -> Option<ClientEvent> {
         let sender = match command.prefix {
-            Some(Sender::Server(ref name)) => name,
-            Some(Sender::User(ref nick, _, _)) => nick,
-            _ => ""
+            Some(Sender::Server(ref name)) => Some(name.to_string()),
+            Some(Sender::User(ref nick, _, _)) => Some(nick.to_string()),
+            _ => None
         };
-
-        let sender = sender.to_string();
 
         match command.command {
             CommandType::PrivMsg => {
@@ -42,14 +40,21 @@ impl ClientEvent {
             CommandType::Notice => {
                 let target = command.get_param(0).unwrap_or("ERROR").to_string();
                 let message = command.get_param(1).unwrap_or("ERROR").to_string();
-
                 Some(ClientEvent::NoticeMessage(target, sender, message))
             },
             CommandType::Topic => {
                 let target = command.get_param(0).unwrap_or("ERROR").to_string();
                 let message = command.get_param(1).unwrap_or("ERROR").to_string();
-
                 Some(ClientEvent::Topic(target, message))
+            },
+            CommandType::Rpl_Topic => {
+                let target = command.get_param(1).unwrap_or("ERROR").to_string();
+                let message = command.get_param(2).unwrap_or("ERROR").to_string();
+                Some(ClientEvent::Topic(target, message))
+            },
+            CommandType::Rpl_NoTopic => {
+                let target = command.get_param(1).unwrap_or("ERROR").to_string();
+                Some(ClientEvent::Topic(target, "".to_string()))
             },
             _ => None
         }

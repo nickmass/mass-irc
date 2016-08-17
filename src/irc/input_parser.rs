@@ -15,7 +15,8 @@ pub struct UserInputParser {
 
 impl UserInputParser {
     pub fn parse(input: String) -> Result<UserCommand, ParseError> {
-        let state = State::default();
+        let mut state = State::default();
+        state.active_window = "#test".to_string();
         if input.len() == 0 { return Err(ParseError::InputRequired); }
         if !input.starts_with('/') {
             return Ok(UserCommand::PrivMsg(state.active_window.clone(),
@@ -51,6 +52,15 @@ impl UserInputParser {
             },
             "/quit" => {
                 UserCommand::Quit(parts.1.to_string())
+            },
+            "/topic" => {
+                if parts.1.trim().len() > 0 {
+                    UserCommand::SetTopic(state.active_window.clone(), parts.1.to_string())   
+                } else if parts.1.len() > 0 {
+                    UserCommand::SetTopic(state.active_window.clone(), "".to_string())
+                } else {
+                    UserCommand::GetTopic(state.active_window.clone())
+                }
             },
             _ => {
                 println!("{:?}", parts);

@@ -123,20 +123,22 @@ impl CommandParser {
                chain!(
                    tag_s!(" ") ~
                    not!(tag_s!(":")) ~
-                   param: is_not_s!(" \r\n\0") , 
+                   param: is_not_s!(" \r\n\0"),
                    || param.to_string()));
 
-        named!(trailing<&str, String >, chain! (
-                    tag_s!(" ") ~
-                    tag_s!(":") ~
+        named!(trailing_string<&str, String >, chain! (
+                    tag_s!(" :") ~
                     trailing: is_not_s!("\r\n\0"),
                     || trailing.to_string()));
+
+        named!(trailing_empty<&str, String >, map!(tag_s!(" :"),
+                                |x| "".to_string()));
 
         named!(params<&str, Params >,
                chain!(
                    params: many0!(param) ~
-                   trailing: trailing? ~
-                   tag_s!("\r\n"),
+                   trailing: alt!(trailing_string | trailing_empty)? ~
+                   tag_s!("\r\n") ,
                     || {
                             let mut params = params;
                             if trailing.is_some() {
@@ -156,7 +158,8 @@ impl CommandParser {
 
         let r = command_parser(str::from_utf8(message).unwrap());
         if r.is_err() {
-            println!("{:?}", r);
+            error!("{}", str::from_utf8(message).unwrap());
+            error!("{:?}", r);
         }
         r.unwrap().1
     }

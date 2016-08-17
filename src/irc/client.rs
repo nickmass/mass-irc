@@ -93,8 +93,9 @@ impl Task for ClientTask {
                         }
                         match ClientEvent::from_command(&msg) {
                             Some(ev) => { let _ = self.tunnel.try_write(ev); },
-                            _ => { self.tunnel.try_write(ClientEvent::Command(msg)); },
+                            _ => {  },
                         }
+                        self.tunnel.try_write(ClientEvent::Command(msg));
                     }
                 },
                 _ => {}
@@ -105,6 +106,7 @@ impl Task for ClientTask {
         match self.tunnel.try_read() {
             Ok(Some(d)) => {
                 let command = d.to_command().unwrap();
+                self.tunnel.try_write(ClientEvent::Command(command.clone()));
                 match command.command {
                     CommandType::PrivMsg => {
                         match ClientEvent::from_command(&command) {
