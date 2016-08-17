@@ -1,4 +1,4 @@
-use term::{Key, KeyReader, Color, Surface, TermStream, TermBuffer, UserInput, Point, Rect};
+use term::{Modifier, Key, KeyReader, Color, Surface, TermStream, TermBuffer, UserInput, Point, Rect};
 use termion::cursor;
 
 use std::io::Write;
@@ -32,75 +32,94 @@ impl TextInput {
 
     pub fn read(&mut self, stream: &mut TermStream) -> Option<UserInput> {
         self.reader.fill(stream);
-        let keys: Vec<Key> = self.reader.by_ref().collect();
-        for k in keys {
-            match k {
-                Key::Close =>{ return Some(UserInput::Close); },
-                Key::Up => {
-                    if self.history_index + 1 < self.history.len() {
-                        self.set_dirty();
-                        self.history_index += 1;
-                        self.cursor = self.history[self.history_index].len() as u32;
-                    }
-                },
-                Key::Down => {
-                    if self.history_index > 0 {
-                        self.set_dirty();
-                        self.history_index -= 1;
-                        self.cursor = self.history[self.history_index].len() as u32;
-                    }
+        let keys: Vec<Modifier> = self.reader.by_ref().collect();
+        for m in keys {
+            match m {
+                Modifier::None(k) => {
+                    match k {
+                        Key::Close =>{ return Some(UserInput::Close); },
+                        Key::Up => {
+                            if self.history_index + 1 < self.history.len() {
+                                self.set_dirty();
+                                self.history_index += 1;
+                                self.cursor = self.history[self.history_index].len() as u32;
+                            }
+                        },
+                        Key::Down => {
+                            if self.history_index > 0 {
+                                self.set_dirty();
+                                self.history_index -= 1;
+                                self.cursor = self.history[self.history_index].len() as u32;
+                            }
 
-                },
-                Key::Right => {
-                    let len = self.history[self.history_index].len() as u32;
-                    if self.cursor + 1 <= len {
-                        self.set_dirty();
-                        self.cursor += 1;
+                        },
+                        Key::Right => {
+                            let len = self.history[self.history_index].len() as u32;
+                            if self.cursor + 1 <= len {
+                                self.set_dirty();
+                                self.cursor += 1;
+                            }
+                        },
+                        Key::Left => {
+                            if self.cursor > 0 {
+                                self.set_dirty();
+                                self.cursor -= 1;
+                            }
+                        },
+                        Key::Ins => {},
+                        Key::Del => {
+                            let len = self.history[self.history_index].len() as u32;
+                            if self.cursor < len {
+                                self.set_dirty();
+                                self.cursor += 1;
+                                self.delete_character();
+                            }
+                        },
+                        Key::Home => {
+                            self.set_dirty();
+                            self.cursor = 0;
+                        },
+                        Key::End => {
+                            self.set_dirty();
+                            let len = self.history[self.history_index].len() as u32;
+                            self.cursor = len;
+                        },
+                        Key::PageUp => {},
+                        Key::PageDown => {},
+                        Key::Backspace => {
+                            self.delete_character();
+                        },
+                        Key::Return => {
+                            let result = self.current_line();
+                            self.cursor = 0;
+                            if self.history_index == 0 {
+                                self.history.push_front(Vec::new());
+                            } else {
+                                self.history_index = 0;
+                                self.history[0] = Vec::new();
+                            }
+                            self.set_dirty();
+                            return Some(UserInput::Text(result));
+                        },
+                        Key::Printable(c) => {
+                            self.type_character(c as u8);
+                        },
+                        _ => {}
                     }
                 },
-                Key::Left => {
-                    if self.cursor > 0 {
-                        self.set_dirty();
-                        self.cursor -= 1;
+                Modifier::Alt(k) => {
+                    match k {
+                        Key::Printable(c) if c.is_digit(10) => {
+                            return Some(UserInput::SetTab(c as u32 - 48));
+                        },
+                        Key::Left => {
+                            return Some(UserInput::PrevTab);
+                        },
+                        Key::Right => {
+                            return Some(UserInput::NextTab);
+                        },
+                        _ => {}
                     }
-                },
-                Key::Ins => {},
-                Key::Del => {
-                    let len = self.history[self.history_index].len() as u32;
-                    if self.cursor < len {
-                        self.set_dirty();
-                        self.cursor += 1;
-                        self.delete_character();
-                    }
-                },
-                Key::Home => {
-                    self.set_dirty();
-                    self.cursor = 0;
-                },
-                Key::End => {
-                    self.set_dirty();
-                    let len = self.history[self.history_index].len() as u32;
-                    self.cursor = len;
-                },
-                Key::PageUp => {},
-                Key::PageDown => {},
-                Key::Backspace => {
-                    self.delete_character();
-                },
-                Key::Return => {
-                    let result = self.current_line();
-                    self.cursor = 0;
-                    if self.history_index == 0 {
-                        self.history.push_front(Vec::new());
-                    } else {
-                        self.history_index = 0;
-                        self.history[0] = Vec::new();
-                    }
-                    self.set_dirty();
-                    return Some(UserInput::Text(result));
-                },
-                Key::Printable(c) => {
-                    self.type_character(c as u8);
                 },
                 _ => {}
             }

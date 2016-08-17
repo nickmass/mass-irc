@@ -5,7 +5,7 @@ pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
 pub mod controls;
 pub use self::controls::{MessagePane, TextInput, TabBar, TabStatus, TabToken};
 mod keys;
-pub use self::keys::{Key, KeyReader};
+pub use self::keys::{Modifier, Key, KeyReader};
 
 use irc::{CommandType, CommandBuilder, ClientEvent, UserInputParser, Command, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
@@ -15,6 +15,9 @@ use std::collections::HashMap;
 pub enum UserInput {
     Close,
     Text(String),
+    SetTab(u32),
+    PrevTab,
+    NextTab,
 }
 
 pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
@@ -54,6 +57,11 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                         match self.channels.get(&channel) {
                             Some(tab) => {
                                 let msg = format!("[{: >13.13}]: {}\r\n", sender.unwrap_or(me.to_string()), message);
+                                if msg.find(me) != None {
+                                    self.tab_bar.set_alert(*tab);
+                                } else {
+                                    self.tab_bar.set_unread(*tab);
+                                }
                                 self.message_pane.add_message(Some(*tab), msg);
                             },
                             None => {},
@@ -93,6 +101,38 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
 
             match self.text_input.read(&mut self.stream) {
                 Some(UserInput::Close) => break,
+                Some(UserInput::SetTab(c)) => {
+                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    sorted_channels.sort();
+                    if let Some(c) = sorted_channels.get((c - 1) as usize) {
+                        self.tab_bar.set_active(*c);
+                        self.message_pane.set_dirty();
+                    }
+                },
+                Some(UserInput::PrevTab) => {
+                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    sorted_channels.sort();
+                    if let Some(tab) = self.tab_bar.active_tab() {
+                        if let Ok(pos) = sorted_channels.binary_search(&tab) {
+                            if pos > 0 {
+                                self.tab_bar.set_active(*sorted_channels.get(pos - 1).unwrap());
+                                self.message_pane.set_dirty();
+                            }
+                        }
+                    }
+                },
+                Some(UserInput::NextTab) => {
+                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    sorted_channels.sort();
+                    if let Some(tab) = self.tab_bar.active_tab() {
+                        if let Ok(pos) = sorted_channels.binary_search(&tab) {
+                            if pos + 1 < sorted_channels.len() {
+                                self.tab_bar.set_active(*sorted_channels.get(pos + 1).unwrap());
+                                self.message_pane.set_dirty();
+                            }
+                        }
+                    }
+                },
                 Some(UserInput::Text(s)) => {
                     match UserInputParser::parse(s) {
                         Ok(msg) => { let _ = self.tunnel.write(msg); },

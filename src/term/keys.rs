@@ -21,10 +21,18 @@ pub enum Key {
     Esc,
 }
 
+pub enum Modifier {
+    None(Key),
+    Alt(Key),
+    Ctrl(Key),
+    Shift(Key),
+    Meta(Key),
+}
+
 pub struct KeyReader {
     read_buf: VecDeque<u8>,
     escape_buf: VecDeque<u8>,
-    invalid_escape: bool,
+    alt_modifier: bool,
 }
 
 impl KeyReader {
@@ -32,7 +40,7 @@ impl KeyReader {
         KeyReader {
             read_buf: VecDeque::new(),
             escape_buf: VecDeque::new(),
-            invalid_escape: false,
+            alt_modifier: false,
         }
     }
 
@@ -42,28 +50,9 @@ impl KeyReader {
             self.read_buf.extend(&buf[0..bytes])
         }
     }
-        
-    fn is_printable(c: u8) -> bool {
-        c >= 32 && c <= 127
-    }
-}
 
-impl Iterator for KeyReader {
-    type Item=Key;
-
-    fn next(&mut self) -> Option<Self::Item> { 
+    fn read_key(&mut self) -> Option<Key> { 
         loop {
-            if self.invalid_escape {
-                self.invalid_escape = false;
-                let esc = self.escape_buf.pop_front().unwrap();
-                while self.escape_buf.len() != 0 {
-                    let c = self.escape_buf.pop_back().unwrap();
-                    self.read_buf.push_front(c);
-                }
-
-                return Some(Key::Esc);
-            }
-
             let c = self.read_buf.pop_front();
 
             if c.is_none() { return None; }
@@ -85,13 +74,24 @@ impl Iterator for KeyReader {
                     b"\x1b[6~" => Some(Key::PageDown),
                     b"\x1b[7~" => Some(Key::Home),
                     b"\x1b[8~" => Some(Key::End),
-                    _ => { self.invalid_escape = true; None }
+                    _ => {
+                        let esc = self.escape_buf.pop_front().unwrap();
+                        while self.escape_buf.len() != 0 {
+                            let c = self.escape_buf.pop_back().unwrap();
+                            self.read_buf.push_front(c);
+                        }
+                        if !self.alt_modifier {
+                            self.alt_modifier = true;
+                            None
+                        } else {
+                            Some(Key::Esc)
+                        }
+                    }
                 };
                 
                 if key == None { continue; }
 
                 self.escape_buf.clear();
-                self.invalid_escape = false;
                 return key;
             }
 
@@ -113,4 +113,26 @@ impl Iterator for KeyReader {
             return key;
         }
     }
+        
+    fn is_printable(c: u8) -> bool {
+        c >= 32 && c <= 127
+    }
+}
+
+impl Iterator for KeyReader {
+    type Item=Modifier;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.read_key() {
+            Some(k) => {
+                if self.alt_modifier {
+                    self.alt_modifier = false;
+                    Some(Modifier::Alt(k))
+                } else {
+                    Some(Modifier::None(k))
+                }
+            },
+            None => None
+        }
+    }
+
 }

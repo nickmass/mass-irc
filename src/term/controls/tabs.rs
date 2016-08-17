@@ -1,6 +1,6 @@
 use term::{Rect, Point, Color, TermBuffer, Surface};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TabToken(u32);
 
 impl TabToken {
@@ -78,8 +78,8 @@ impl Tab {
         dirty
     }
 
-    fn to_string(&self) -> String {
-        format!(" {} {}. {}  ", self.status.to_string(self.next), self.token.0, self.title)
+    fn to_string(&self, index: u32) -> String {
+        format!(" {} {}. {}  ", self.status.to_string(self.next), index, self.title)
     }
 }
 
@@ -150,6 +150,7 @@ impl TabBar {
     }
 
     pub fn set_active(&mut self, tab: TabToken) {
+        self.clear_active();
         let tab = self.tabs.iter_mut().find(|x| x.token == tab);
         if let Some(tab) = tab {
             tab.set_status(TabStatus::Active);
@@ -157,21 +158,21 @@ impl TabBar {
     }
 
     pub fn set_read(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab);
+        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
         if let Some(tab) = tab {
             tab.set_status(TabStatus::Read);
         }
     }
 
     pub fn set_unread(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab);
+        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status == TabStatus::Read);
         if let Some(tab) = tab {
             tab.set_status(TabStatus::Unread);
         }
     }
 
     pub fn set_alert(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab);
+        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
         if let Some(tab) = tab {
             tab.set_status(TabStatus::Alert);
         }
@@ -189,8 +190,8 @@ impl TabBar {
         let mut surf = Surface::new(Rect(Point(0,0), width, 2));
         let mut i = 0;
         let active_tab = self.active_tab().unwrap_or(TabToken(9999999));
-        for tab in &mut self.tabs {
-            let tab_str = tab.to_string();
+        for (index, tab) in &mut self.tabs.iter_mut().enumerate() {
+            let tab_str = tab.to_string(index as u32 + 1);
             let status = tab.get_status();
             let colors = match status {
                 TabStatus::Active => (Color::White, Color::Red, Color::Black),
