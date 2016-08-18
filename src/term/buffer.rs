@@ -1,6 +1,7 @@
 use termion::{terminal_size};
 use term::TermStream;
 use std::io::Write;
+use term::term_string::TermString;
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
@@ -50,7 +51,7 @@ impl Color {
     }
 }
 #[derive(Clone, Copy, Debug)]
-pub struct Glyph(char, Option<Color>, Option<Color>);
+pub struct Glyph(pub char, pub Option<Color>, pub Option<Color>);
 
 impl Glyph {
     pub fn to_string(&self) -> String {
@@ -179,6 +180,14 @@ impl Surface {
             for y in rect.vertical() {
                 self.set_char(' ', Point(x, y));
             }
+        }
+    }
+
+    pub fn formatted_text(&mut self, text: TermString, dest: Point) {
+        for i in 0..text.len() {
+            let x = i as u32;
+            if x + dest.x() >= self.rect().width() { break; }
+            self.set_glyph(text.get(i).unwrap(), Point(x + dest.x(), dest.y()));
         }
     }
 

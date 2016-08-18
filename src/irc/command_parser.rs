@@ -19,7 +19,7 @@ impl CommandParser {
         }
 
         fn host(c: char) -> bool {
-            c == '.' || alphabetic(c) || c.is_digit(10)
+            c == ':' || c == '/' || c == '-' || c == '.' || alphabetic(c) || c.is_digit(10)
         }
 
         fn nick_char(c: char) -> bool {
@@ -27,7 +27,7 @@ impl CommandParser {
         }
 
         fn special(c: char) -> bool {
-            c == '-' || c =='[' || c == ']' || c == '\\' || c == '`' || c == '^' || c =='{' || c == '}'
+            c=='|' || c == '_' || c  == '-' || c =='[' || c == ']' || c == '\\' || c == '`' || c == '^' || c =='{' || c == '}'
         }
 
         fn alphabetic(c: char) -> bool {

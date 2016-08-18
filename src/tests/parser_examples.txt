@@ -95,3 +95,7 @@ USERS eff.org
 USERHOST Wiz Michael syrk
 :ircd.stealth.net 302 yournick :syrk=+syrk@millennium.stealth.net
 ISON phone trillian WiZ jarlek Avalon Angel Monstah syrk
+:Maligo!~NickMass@d104-205-188-62.abhsia.telus.net JOIN ##rust
+:annoymouse_!uid11754@gateway/web/irccloud.com/x-ffqvstdgovfyizkt JOIN ##linux
+:kittykitty!~kittykitt@2a02:c7d:bc63:9800:e8de:1593:b1e0:dcfe PRIVMSG ##linux :ioanm, i have the cmdline but some of the names are wrong
+:tux|dude!~tuxdude14@122.56.89.81 QUIT :Quit: Leaving

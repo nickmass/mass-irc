@@ -14,9 +14,8 @@ pub struct UserInputParser {
 }
 
 impl UserInputParser {
-    pub fn parse(input: String) -> Result<UserCommand, ParseError> {
-        let mut state = State::default();
-        state.active_window = "#test".to_string();
+    pub fn parse(input: String, active_window: Option<&str>) -> Result<UserCommand, ParseError> {
+        let state = State { active_window: active_window.unwrap_or("").to_string() };
         if input.len() == 0 { return Err(ParseError::InputRequired); }
         if !input.starts_with('/') {
             return Ok(UserCommand::PrivMsg(state.active_window.clone(),

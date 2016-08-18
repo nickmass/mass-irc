@@ -10,4 +10,5 @@ futures = "0.1.0"
 log = "0.3"
 env_logger = "0.3"
 termion = "1.0.0"
+clap = "2.10.0"
 mio = { git = "https://github.com/carllerche/mio", branch = "dev" }

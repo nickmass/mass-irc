@@ -1,11 +1,13 @@
 mod stream;
 pub use self::stream::TermStream;
-mod buffer;
+pub mod buffer;
 pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
 pub mod controls;
 pub use self::controls::{MessagePane, TextInput, TabBar, TabStatus, TabToken};
 mod keys;
 pub use self::keys::{Modifier, Key, KeyReader};
+pub mod term_string;
+pub use self::term_string::{TermString};
 
 use irc::{ClientEvent, UserInputParser, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
@@ -27,7 +29,7 @@ pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
     message_pane: MessagePane,
     text_input: TextInput,
     tab_bar: TabBar,
-    channels: HashMap<String, TabToken>,
+    channels: Vec<(TabToken, String)>,
 }
 
 impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=ClientEvent> {
@@ -39,10 +41,38 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             message_pane: MessagePane::new(),
             text_input: TextInput::new(),
             tab_bar: TabBar::new(),
-            channels: HashMap::new(),
+            channels: Vec::new(),
         };
         
         term
+    }
+
+    pub fn find_channel(&self, tab: TabToken) -> Option<usize> {
+        self.channels.iter().position(|x| x.0 == tab )
+    }
+
+    pub fn find_tab(&self, channel: &str) -> Option<usize> {
+        self.channels.iter().position(|x| &*x.1 == channel )
+    }
+    
+
+    fn get_user_color(nick: &str) -> String {
+        let color_options: [&'static str; 12] = 
+            [ "Blue",
+            "Cyan" ,
+            "Green" ,
+            "LightBlue",
+            "LightCyan",
+            "LightGreen" ,
+            "LightMagenta",
+            "LightRed" ,
+            "LightYellow",
+            "Magenta",
+            "Red" ,
+            "Yellow"];
+        let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
+        
+        format!("[\0color:{};\0{}\0color:White;\0]:",color_options[index as usize], nick)
     }
 
     pub fn run(&mut self) {
@@ -54,15 +84,18 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                         self.message_pane.add_message(None, m.to_string());
                     },
                     Ok(Some(ClientEvent::ChannelMessage(channel, sender, message))) => {
-                        match self.channels.get(&channel) {
-                            Some(tab) => {
-                                let msg = format!("[{: >13.13}]: {}\r\n", sender.unwrap_or(me.to_string()), message);
+                        match self.find_tab(&channel) {
+                            Some(pos) => {
+                                let tab = self.channels[pos].0;
+                                let nick = Self::get_user_color(&*sender.unwrap_or(me.to_string()));
+                                let msg = format!("{} {}\r\n", nick, message);
                                 if msg.find(me) != None {
-                                    self.tab_bar.set_alert(*tab);
+                                    self.tab_bar.set_alert(tab);
                                 } else {
-                                    self.tab_bar.set_unread(*tab);
+                                    self.tab_bar.set_unread(tab);
                                 }
-                                self.message_pane.add_message(Some(*tab), msg);
+                                let msg = TermString::from_str(&msg);
+                                self.message_pane.add_formatted_message(Some(tab), msg);
                             },
                             None => {},
                         }
@@ -72,13 +105,15 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                             let tab = self.tab_bar.add_tab(channel.to_string(),
                                                            "".to_string(),
                                                            TabStatus::Active);
-                            self.channels.insert(channel.to_string(), tab);
+                            self.channels.push((tab, channel.to_string()));
                         }
                     },
                     Ok(Some(ClientEvent::LeaveChannel(channel, sender))) => {
                         if sender.unwrap_or("".to_string()) == me {
-                            match self.channels.remove(&channel) {
-                                Some(tab) => {
+                            match self.find_tab(&channel) {
+                                Some(pos) => {
+                                    let tab = self.channels[pos].0;
+                                    self.channels.remove(pos);
                                     self.tab_bar.remove_tab(tab);
                                 },
                                 None => {}
@@ -86,9 +121,10 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                         }
                     },
                     Ok(Some(ClientEvent::Topic(channel, topic))) => {
-                        match self.channels.get(&channel) {
-                            Some(tab) => { 
-                                self.tab_bar.set_topic(*tab, topic.to_string()); 
+                        match self.find_tab(&channel) {
+                            Some(pos) => { 
+                                let tab = self.channels[pos].0;
+                                self.tab_bar.set_topic(tab, topic.to_string()); 
                             },
                             None => {}
                         }
@@ -102,7 +138,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             match self.text_input.read(&mut self.stream) {
                 Some(UserInput::Close) => break,
                 Some(UserInput::SetTab(c)) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
                     sorted_channels.sort();
                     if let Some(c) = sorted_channels.get((c - 1) as usize) {
                         self.tab_bar.set_active(*c);
@@ -110,7 +146,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     }
                 },
                 Some(UserInput::PrevTab) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
                     sorted_channels.sort();
                     if let Some(tab) = self.tab_bar.active_tab() {
                         if let Ok(pos) = sorted_channels.binary_search(&tab) {
@@ -122,7 +158,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     }
                 },
                 Some(UserInput::NextTab) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| *x.1).collect::<Vec<TabToken>>();
+                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
                     sorted_channels.sort();
                     if let Some(tab) = self.tab_bar.active_tab() {
                         if let Ok(pos) = sorted_channels.binary_search(&tab) {
@@ -134,7 +170,13 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     }
                 },
                 Some(UserInput::Text(s)) => {
-                    match UserInputParser::parse(s) {
+                    let channel = if let Some(tab) = self.tab_bar.active_tab() {
+                        self.find_channel(tab).map(|x| &*self.channels[x].1)
+                    } else {
+                        None
+                    };
+
+                    match UserInputParser::parse(s, channel) {
                         Ok(msg) => { let _ = self.tunnel.write(msg); },
                         Err(_) =>{ unimplemented!(); },
                     }
