@@ -8,11 +8,12 @@ mod keys;
 pub use self::keys::{Modifier, Key, KeyReader};
 pub mod term_string;
 pub use self::term_string::{TermString};
+mod window;
+use self::window::ChatWindows;
 
 use irc::{ClientEvent, UserInputParser, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
 use std::thread;
 use std::time::Duration;
-use std::collections::HashMap;
 
 pub enum UserInput {
     Close,
@@ -26,108 +27,61 @@ pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
     tunnel: ClientTunnel<S, R>,
     stream: TermStream,
     window: TermBuffer,
-    message_pane: MessagePane,
+    chat: ChatWindows,
     text_input: TextInput,
-    tab_bar: TabBar,
-    channels: Vec<(TabToken, String)>,
+    nickname: String,
+    realname: String,
 }
 
 impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=ClientEvent> {
-    pub fn new(tunnel: ClientTunnel<S, R>) -> Terminal<S,R> {
+    pub fn new(tunnel: ClientTunnel<S, R>, nickname: String, realname: String) ->
+            Terminal<S,R> {
         let term = Terminal {
             tunnel: tunnel,
             stream: TermStream::new().unwrap(),
             window: TermBuffer::new(),
-            message_pane: MessagePane::new(),
+            chat: ChatWindows::new(MessagePane::new(), TabBar::new()),
             text_input: TextInput::new(),
-            tab_bar: TabBar::new(),
-            channels: Vec::new(),
+            nickname: nickname,
+            realname: realname,
         };
         
         term
     }
 
-    pub fn find_channel(&self, tab: TabToken) -> Option<usize> {
-        self.channels.iter().position(|x| x.0 == tab )
-    }
-
-    pub fn find_tab(&self, channel: &str) -> Option<usize> {
-        self.channels.iter().position(|x| &*x.1 == channel )
-    }
-    
-
-    fn get_user_color(nick: &str) -> String {
-        let color_options: [&'static str; 12] = 
-            [ "Blue",
-            "Cyan" ,
-            "Green" ,
-            "LightBlue",
-            "LightCyan",
-            "LightGreen" ,
-            "LightMagenta",
-            "LightRed" ,
-            "LightYellow",
-            "Magenta",
-            "Red" ,
-            "Yellow"];
-        let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
-        
-        format!("[\0color:{};\0{}\0color:White;\0]:",color_options[index as usize], nick)
-    }
-
     pub fn run(&mut self) {
-        let me = "NickMass";
         loop {
             loop {
                 match self.tunnel.try_read() {
+                    Ok(Some(ClientEvent::Connected)) => {
+                        let _ = self.tunnel.write(UserCommand::Nick(
+                                self.nickname.to_string()));
+                        let _ = self.tunnel.write(UserCommand::User(
+                                self.nickname.to_string(), 
+                                "8".to_string(), 
+                                self.realname.to_string()));
+                    },
                     Ok(Some(ClientEvent::Command(m))) => {
-                        self.message_pane.add_message(None, m.to_string());
+                        self.chat.add_server_message(m.to_string());
                     },
                     Ok(Some(ClientEvent::ChannelMessage(channel, sender, message))) => {
-                        match self.find_tab(&channel) {
-                            Some(pos) => {
-                                let tab = self.channels[pos].0;
-                                let nick = Self::get_user_color(&*sender.unwrap_or(me.to_string()));
-                                let msg = format!("{} {}\r\n", nick, message);
-                                if msg.find(me) != None {
-                                    self.tab_bar.set_alert(tab);
-                                } else {
-                                    self.tab_bar.set_unread(tab);
-                                }
-                                let msg = TermString::from_str(&msg);
-                                self.message_pane.add_formatted_message(Some(tab), msg);
-                            },
-                            None => {},
-                        }
+                        self.chat.add_chat_message(channel,
+                                              sender.as_ref().map(|x| &**x)
+                                                .unwrap_or(&*self.nickname),
+                                              &message);
                     },
                     Ok(Some(ClientEvent::JoinChannel(channel, sender))) => {
-                        if sender.unwrap_or("".to_string()) == me {
-                            let tab = self.tab_bar.add_tab(channel.to_string(),
-                                                           "".to_string(),
-                                                           TabStatus::Active);
-                            self.channels.push((tab, channel.to_string()));
+                        if sender.unwrap_or("".to_string()) == self.nickname {
+                            self.chat.add_channel(channel);
                         }
                     },
                     Ok(Some(ClientEvent::LeaveChannel(channel, sender))) => {
-                        if sender.unwrap_or("".to_string()) == me {
-                            match self.find_tab(&channel) {
-                                Some(pos) => {
-                                    let tab = self.channels[pos].0;
-                                    self.channels.remove(pos);
-                                    self.tab_bar.remove_tab(tab);
-                                },
-                                None => {}
-                            }
+                        if sender.unwrap_or("".to_string()) == self.nickname {
+                            self.chat.remove_channel(&channel);
                         }
                     },
                     Ok(Some(ClientEvent::Topic(channel, topic))) => {
-                        match self.find_tab(&channel) {
-                            Some(pos) => { 
-                                let tab = self.channels[pos].0;
-                                self.tab_bar.set_topic(tab, topic.to_string()); 
-                            },
-                            None => {}
-                        }
+                        self.chat.add_topic(channel, topic);
                     },
                     Ok(None) => break,
                     Ok(_) => {},
@@ -138,43 +92,16 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             match self.text_input.read(&mut self.stream) {
                 Some(UserInput::Close) => break,
                 Some(UserInput::SetTab(c)) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
-                    sorted_channels.sort();
-                    if let Some(c) = sorted_channels.get((c - 1) as usize) {
-                        self.tab_bar.set_active(*c);
-                        self.message_pane.set_dirty();
-                    }
+                    self.chat.set_tab(c);
                 },
                 Some(UserInput::PrevTab) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
-                    sorted_channels.sort();
-                    if let Some(tab) = self.tab_bar.active_tab() {
-                        if let Ok(pos) = sorted_channels.binary_search(&tab) {
-                            if pos > 0 {
-                                self.tab_bar.set_active(*sorted_channels.get(pos - 1).unwrap());
-                                self.message_pane.set_dirty();
-                            }
-                        }
-                    }
+                    self.chat.prev_tab();
                 },
                 Some(UserInput::NextTab) => {
-                    let mut sorted_channels = self.channels.iter().map(|x| x.0).collect::<Vec<TabToken>>();
-                    sorted_channels.sort();
-                    if let Some(tab) = self.tab_bar.active_tab() {
-                        if let Ok(pos) = sorted_channels.binary_search(&tab) {
-                            if pos + 1 < sorted_channels.len() {
-                                self.tab_bar.set_active(*sorted_channels.get(pos + 1).unwrap());
-                                self.message_pane.set_dirty();
-                            }
-                        }
-                    }
+                    self.chat.next_tab();
                 },
                 Some(UserInput::Text(s)) => {
-                    let channel = if let Some(tab) = self.tab_bar.active_tab() {
-                        self.find_channel(tab).map(|x| &*self.channels[x].1)
-                    } else {
-                        None
-                    };
+                    let channel = self.chat.active_channel();
 
                     match UserInputParser::parse(s, channel) {
                         Ok(msg) => { let _ = self.tunnel.write(msg); },
@@ -185,14 +112,11 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             }
 
             if self.window.is_dirty() {
-                self.message_pane.set_dirty();
                 self.text_input.set_dirty();
-                self.tab_bar.set_dirty();
             }
 
-            self.message_pane.render(&mut self.window, self.tab_bar.active_tab());
             self.text_input.render(&mut self.window);
-            self.tab_bar.render(&mut self.window);
+            self.chat.render(&mut self.window);
             self.window.render(&mut self.stream);
             self.text_input.set_cursor(&mut self.stream, &self.window);
 
@@ -200,4 +124,3 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
         }
     }
 }
-

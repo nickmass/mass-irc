@@ -8,6 +8,7 @@ pub enum ClientEvent {
     NoticeMessage(String, Option<String>, String),
     Topic(String, String),
     Command(Command),
+    Connected,
 }
 
 impl ClientEvent {

@@ -2,7 +2,7 @@ use irc::{Command,CommandType as CT,CommandBuilder};
 
 pub enum UserCommand {
     Nick(String),
-    User(String, String, String, String),
+    User(String, String, String),
     Join(String),
     PrivMsg(String, String),
     WhoIs(String),
@@ -20,10 +20,10 @@ impl UserCommand {
             UserCommand::Nick(nick) => Ok(b.command(CT::Nick)
                                        .add_param(nick)
                                        .build().unwrap()),
-            UserCommand::User(nick, p, p1, name) => Ok(b.command(CT::User)
+            UserCommand::User(nick, mode, name) => Ok(b.command(CT::User)
                                        .add_param(nick)
-                                       .add_param(p)
-                                       .add_param(p1)
+                                       .add_param(mode)
+                                       .add_param("*".to_string())
                                        .add_param(name)
                                        .build().unwrap()),
             UserCommand::Join(chan) => Ok(b.command(CT::Join)

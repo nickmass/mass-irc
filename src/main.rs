@@ -48,11 +48,18 @@ fn main() {
                      .help("Sets your default nickname")
                      .takes_value(true)
                      .default_value("NickMass"))
+                .arg(Arg::with_name("realname")
+                     .short("r")
+                     .long("realname")
+                     .help("Sets your default real name")
+                     .takes_value(true)
+                     .default_value("Nick Massey"))
                 .get_matches();
 
     let server = matches.value_of("server").unwrap();
     let port = matches.value_of("port").unwrap();
     let nick = matches.value_of("nick").unwrap();
+    let realname = matches.value_of("realname").unwrap();
 
     let ip = match format!("{}:{}", server, port).parse::<net::SocketAddrV4>() {
         Ok(addr) => Some(addr),
@@ -83,10 +90,9 @@ fn main() {
     }
 
     let ip = ip.unwrap();
-    println!("{:?}", ip);
 
     let client = Client::new();
     let tunnel = client.connect(format!("{}:{}", ip.ip(), port).parse().unwrap());
-    let mut terminal = Terminal::new(tunnel);
+    let mut terminal = Terminal::new(tunnel, nick.to_string(), realname.to_string());
     terminal.run();
 }

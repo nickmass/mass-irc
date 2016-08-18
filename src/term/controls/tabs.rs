@@ -1,6 +1,6 @@
 use term::{Rect, Point, Color, TermBuffer, Surface};
 
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct TabToken(u32);
 
 impl TabToken {
@@ -184,7 +184,7 @@ impl TabBar {
         for tab in &mut self.tabs {
             dirty = dirty | tab.tick(self.tick);
         }
-        if !dirty { return; }
+        if !window.is_dirty() && !dirty { return; }
 
         let width = window.width();
         let mut surf = Surface::new(Rect(Point(0,0), width, 2));

@@ -66,14 +66,7 @@ impl ClientTask  {
 impl Task for ClientTask {
     fn tick(&mut self) -> io::Result<Tick> {
         if self.tick == 1 {
-            try!(self.server.write(Frame::Message(UserCommand::User(
-                        "NickMass".into(),
-                        "8".into(),
-                        "*".into(),
-                        "Nick Massey".into()).to_command().unwrap())));
-            try!(self.server.write(Frame::Message(UserCommand::Nick(
-                        "NickMass".into()).to_command().unwrap())));
-            try!(self.server.flush());
+            self.tunnel.try_write(ClientEvent::Connected);
         }
         if let Some(frame) = try!(self.server.read()) {
             match frame {

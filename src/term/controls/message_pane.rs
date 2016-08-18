@@ -22,19 +22,16 @@ impl MessagePane {
 
     pub fn add_message(&mut self, tab: Option<TabToken>, msg: String) {
         self.set_dirty();
-
-        let term : TermString = msg.clone().into();
         self.messages.push((tab, msg.into()));
     }
 
     pub fn add_formatted_message(&mut self, tab: Option<TabToken>, msg: TermString) {
         self.set_dirty();
-
         self.messages.push((tab, msg));
     }
 
     pub fn render(&mut self, window: &mut TermBuffer, tab: Option<TabToken>) {
-        if ! self.is_dirty() { return }
+        if !window.is_dirty() && !self.is_dirty() { return }
 
         let mut messages = TermString::new(); 
         let tab_messages = self.messages.iter().filter(|x| x.0 == tab);
