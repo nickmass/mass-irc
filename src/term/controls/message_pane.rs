@@ -4,51 +4,217 @@ use term::term_string::TermString;
 use term::buffer::Glyph;
 
 pub struct MessagePane {
-    messages: Vec<(Option<TabToken>, TermString)>,
+    messages: Vec<(Option<TabToken>, Message)>,
     dirty: bool,
+    width: u32,
 }
 
 impl MessagePane {
     pub fn new() -> MessagePane {
         MessagePane {
-
             messages: Vec::new(),
             dirty: true,
+            width: 0, //I don't like this
         }
     }
 
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 
-    pub fn add_message(&mut self, tab: Option<TabToken>, msg: String) {
+    pub fn add_server_message(&mut self, tab: Option<TabToken>, msg: String) {
         self.set_dirty();
-        self.messages.push((tab, msg.into()));
+        let index = self.messages.iter().filter(|x| x.0 == tab).count() as u32;
+
+        let message = Message::from_server(self.width, index, msg); 
+
+        self.messages.push((tab, message));
     }
 
-    pub fn add_formatted_message(&mut self, tab: Option<TabToken>, msg: TermString) {
+    pub fn add_chat_message(&mut self, tab: Option<TabToken>,
+                             name: String, message: String) {
         self.set_dirty();
-        self.messages.push((tab, msg));
+        let index = self.messages.iter().filter(|x| x.0 == tab).count() as u32;
+       
+        let message = Message::from_chat(self.width, index, name, message);
+
+        self.messages.push((tab, message));
     }
 
     pub fn render(&mut self, window: &mut TermBuffer, tab: Option<TabToken>) {
+        if self.width != window.width() {
+            self.width = window.width();
+            self.set_dirty();
+            self.messages = self.messages.iter().map(|x| (x.0, x.1.resize(self.width))).collect();
+        }
+
         if !window.is_dirty() && !self.is_dirty() { return }
 
-        let mut messages = TermString::new(); 
         let tab_messages = self.messages.iter().filter(|x| x.0 == tab);
-        for msg in tab_messages {
-            messages.extend_from_term_string(&(msg.1));
-        }
         
         let height = window.height();
         let width = window.width();
 
-        let rendered_msgs = TextWindow::render(messages,
-                           width,
-                           height - 3,
-                           FlowDirection::BottomToTop);
-        window.blit(&rendered_msgs, Point(0,2));
+        let mut rendered_msgs = Surface::new(Rect(Point(0, 0), width, height - 3));
+        rendered_msgs.set_color(Point(0,0), Some(Color::White), Some(Color::Black));
 
+        let mut h = (height - 3) as i32;
+        for m in tab_messages.rev() {
+            h -= m.1.height as i32;
+            if h < 0 { break; }
+            rendered_msgs.blit(&m.1.surface, Point(0, h as u32));
+        }
+        
+        window.blit(&rendered_msgs, Point(0,2));
         self.dirty = false;
+    }
+}
+
+struct Message {
+    width: u32,
+    height: u32,
+    name: Option<String>,
+    message: String,
+    index: u32,
+    surface: Surface,
+}
+
+impl Message {
+    pub fn from_server(width: u32, index: u32, message: String) -> Message {
+        let msg_len = message.len() as u32;
+
+        let height = if msg_len % width == 0 {
+            msg_len / width
+        } else {
+            (msg_len / width) + 1
+        };
+        let mut surface = Surface::new(Rect(Point(0, 0), width, height));
+        
+        let line_color = if index % 2 != 0 {
+            "\0color:White;background:LightBlack;\0"
+        } else {
+            "\0color:White;background:Black;\0"
+        };
+
+        let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
+        let mut char_count = chars.len() as u32;
+        for i in 0..height {
+            let mut line_buf = String::from(line_color);
+            let line_width = if width < char_count {
+                width
+            } else {
+                char_count
+            };
+            char_count -= line_width;
+            let start = (i * width) as usize;
+            let end = start + line_width as usize;
+            for c in &chars[start..end] {
+                line_buf.push(*c);
+            }
+            for i in 0..width-line_width {
+                line_buf.push(' ');
+            }
+            surface.formatted_text(line_buf.into(), Point(0, i));
+        }
+        
+        Message {
+            width: width,
+            height: height,
+            name: None,
+            message: message,
+            index: index,
+            surface: surface,
+        }
+    }
+
+    pub fn from_chat(width: u32, index: u32, name: String, message: String)
+            -> Message {
+        let name_width = 14;
+        let msg_width = width - name_width;
+        let msg_len = message.len() as u32;
+
+        let height = if msg_len % msg_width == 0 {
+            msg_len / msg_width
+        } else {
+            (msg_len / msg_width) + 1
+        };
+
+        let mut surface = Surface::new(Rect(Point(0, 0),width, height));
+        let name_string = Self::format_name(&*name, name_width);
+
+        surface.formatted_text(name_string.into(), Point(0,0));
+        for i in 1..height { //Color gutter
+            surface.formatted_text(
+                "\0color:White;background:Black;\0 ".to_string().into(),
+                Point(0, i))
+        }
+
+        let line_color = if index % 2 != 0 {
+            "\0color:White;background:LightBlack;\0"
+        } else {
+            "\0color:White;background:Black;\0"
+        };
+        
+        let chars: Vec<char> = message.chars().collect();
+        let mut char_count = chars.len() as u32;
+        for i in 0..height {
+            let mut line_buf = String::from(line_color);
+            let line_width = if msg_width < char_count {
+                msg_width
+            } else {
+                char_count
+            };
+            char_count -= line_width;
+            let start = (i * msg_width) as usize;
+            let end = start + line_width as usize;
+            for c in &chars[start..end] {
+                line_buf.push(*c);
+            }
+            for i in 0..msg_width-line_width {
+                line_buf.push(' ');
+            }
+            surface.formatted_text(line_buf.into(), Point(name_width, i));
+        }
+        
+        Message {
+            width: width,
+            height: height,
+            name: Some(name),
+            message: message,
+            index: index,
+            surface: surface,
+        }
+    }
+    
+    fn resize(&self, width: u32) -> Message {
+        match self.name.clone() {
+            Some(name) => {
+                Message::from_chat(width, self.index, name, self.message.clone())
+            },
+            None => {
+                Message::from_server(width, self.index, self.message.clone())
+            }
+        }
+    }
+
+    fn format_name(nick: &str, width: u32) -> String {
+        let color_options: [&'static str; 12] = 
+            [ "Blue",
+            "Cyan" ,
+            "Green" ,
+            "LightBlue",
+            "LightCyan",
+            "LightGreen" ,
+            "LightMagenta",
+            "LightRed" ,
+            "LightYellow",
+            "Magenta",
+            "Red" ,
+            "Yellow"];
+        let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
+        
+        format!("\0color:White;background:Black;\0 [\0color:{};\0{: >width$.width$}\0color:White;\0] "
+                ,color_options[index as usize]
+                ,nick, width = width as usize - 4)
     }
 }
 

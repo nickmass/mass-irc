@@ -100,7 +100,6 @@ impl TermString {
                         term_string.append(&mut span.clone());
                     }
                     
-
                     TermString { internal: term_string }
                 }));
 

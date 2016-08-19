@@ -55,7 +55,13 @@ pub struct Glyph(pub char, pub Option<Color>, pub Option<Color>);
 
 impl Glyph {
     pub fn to_string(&self) -> String {
-        let c = self.0;
+        let c = if (self.0 as u32) < 0x20 {
+            '\x20'
+        } else {
+            self.0
+        };
+        
+
 
         if self.1.is_some() && self.2.is_some() {
             let fg = self.1.unwrap().fg_code();

@@ -34,37 +34,16 @@ impl ChatWindows {
     }
 
     pub fn add_chat_message(&mut self, target: String, from: &str, msg: &str) {
-        let name = Self::format_name(from);
-        let msg = format!("[{}]: {}\r\n",name, msg);
         match self.find_tab(&target) {
             Some(wt) => {
                 let ref win = self.windows[&wt];
-                self.message_pane.add_formatted_message(Some(win.tab), 
-                                                        msg.into());
+                self.message_pane.add_chat_message(Some(win.tab),
+                from.to_string(), msg.to_string());
             },
             None => {
             
             }
         }
-    }
-
-    fn format_name(nick: &str) -> String {
-        let color_options: [&'static str; 12] = 
-            [ "Blue",
-            "Cyan" ,
-            "Green" ,
-            "LightBlue",
-            "LightCyan",
-            "LightGreen" ,
-            "LightMagenta",
-            "LightRed" ,
-            "LightYellow",
-            "Magenta",
-            "Red" ,
-            "Yellow"];
-        let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
-        
-        format!("\0color:{};\0{}\0color:White;\0",color_options[index as usize], nick)
     }
 
     pub fn next_tab(&mut self) {
@@ -125,7 +104,7 @@ impl ChatWindows {
     }
 
     pub fn add_server_message(&mut self, msg: String) {
-        self.message_pane.add_message(None, msg);
+        self.message_pane.add_server_message(None, msg);
     }
 
     pub fn set_tab(&mut self, index: u32) {
