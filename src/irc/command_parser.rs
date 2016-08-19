@@ -79,7 +79,7 @@ impl CommandParser {
                 tag_s!(":") ~
                 nick: take_while1_s!(nick_char)~
                 expr_opt!(
-                    if alphabetic(nick.chars().next().unwrap()) {
+                    if !nick.chars().next().unwrap().is_digit(10) {
                         Some(nick)
                     } else {
                         None

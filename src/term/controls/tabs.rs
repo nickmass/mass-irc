@@ -201,7 +201,7 @@ impl TabBar {
             };
 
             if tab.token == active_tab {
-                surf.text(&tab.topic, Point(1,1));
+                surf.text(&tab.topic[0..(width - 2) as usize], Point(1,1));
                 surf.set_color(Point(0, 1), Some(Color::Black),
                                             Some(Color::White));
             }

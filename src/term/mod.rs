@@ -85,7 +85,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     },
                     Ok(None) => break,
                     Ok(_) => {},
-                    Err(_) => unimplemented!(),
+                    Err(_) => {}
                 }
             }
 
@@ -120,7 +120,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             self.window.render(&mut self.stream);
             self.text_input.set_cursor(&mut self.stream, &self.window);
 
-            thread::sleep(Duration::from_millis(16));
+            thread::sleep(Duration::from_millis(50));
         }
     }
 }

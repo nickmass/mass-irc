@@ -99,3 +99,4 @@ ISON phone trillian WiZ jarlek Avalon Angel Monstah syrk
 :annoymouse_!uid11754@gateway/web/irccloud.com/x-ffqvstdgovfyizkt JOIN ##linux
 :kittykitty!~kittykitt@2a02:c7d:bc63:9800:e8de:1593:b1e0:dcfe PRIVMSG ##linux :ioanm, i have the cmdline but some of the names are wrong
 :tux|dude!~tuxdude14@122.56.89.81 QUIT :Quit: Leaving
+:_Forbin!~ehaeeh@ool-944a123e.dyn.optonline.net PRIVMSG #football :http://www.surenews.com/sports/dude-solves-a-rubiks-cube-faster-than-usain-bolt-can-run/
