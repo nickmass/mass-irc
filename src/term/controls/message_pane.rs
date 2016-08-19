@@ -90,9 +90,9 @@ impl Message {
         let mut surface = Surface::new(Rect(Point(0, 0), width, height));
         
         let line_color = if index % 2 != 0 {
-            "\0color:White;background:LightBlack;\0"
+            "\0color:White;background:Grayscale(76);\0"
         } else {
-            "\0color:White;background:Black;\0"
+            "\0color:White;background:Grayscale(25);\0"
         };
 
         let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
@@ -144,14 +144,14 @@ impl Message {
         surface.formatted_text(name_string.into(), Point(0,0));
         for i in 1..height { //Color gutter
             surface.formatted_text(
-                "\0color:White;background:Black;\0 ".to_string().into(),
+                "\0color:White;background:Grayscale(25);\0 ".to_string().into(),
                 Point(0, i))
         }
 
         let line_color = if index % 2 != 0 {
-            "\0color:White;background:LightBlack;\0"
+            "\0color:White;background:Grayscale(76);\0"
         } else {
-            "\0color:White;background:Black;\0"
+            "\0color:White;background:Grayscale(25);\0"
         };
         
         let chars: Vec<char> = message.chars().collect();

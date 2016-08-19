@@ -22,32 +22,73 @@ pub enum Color {
     Red,
     White,
     Yellow,
+    Rgb(u8, u8, u8),
+    Grayscale(u8),
 }
 
 impl Color {
-    pub fn fg_code(&self) -> u32 {
+    pub fn fg_code(&self) -> String {
         match *self {
-            Color::Black => 30,
-            Color::Blue => 34,
-            Color::Cyan => 36,
-            Color::Green => 32,
-            Color::LightBlack => 90,
-            Color::LightBlue => 94,
-            Color::LightCyan => 96,
-            Color::LightGreen => 92,
-            Color::LightMagenta => 95,
-            Color::LightRed => 91,
-            Color::LightWhite => 97,
-            Color::LightYellow => 93,
-            Color::Magenta => 35,
-            Color::Red => 31,
-            Color::White => 37,
-            Color::Yellow => 93,
+            Color::Black => "30".to_string(),
+            Color::Blue => "34".to_string(),
+            Color::Cyan => "36".to_string(),
+            Color::Green => "32".to_string(),
+            Color::LightBlack => "90".to_string(),
+            Color::LightBlue => "94".to_string(),
+            Color::LightCyan => "96".to_string(),
+            Color::LightGreen => "92".to_string(),
+            Color::LightMagenta => "95".to_string(),
+            Color::LightRed => "91".to_string(),
+            Color::LightWhite => "97".to_string(),
+            Color::LightYellow => "93".to_string(),
+            Color::Magenta => "35".to_string(),
+            Color::Red => "31".to_string(),
+            Color::White => "37".to_string(),
+            Color::Yellow => "93".to_string(),
+            Color::Rgb(r, g, b) => {
+                let r = r >> 6;
+                let g = g >> 6;
+                let b = b >> 6;
+                let val = 16 + (36 * r) + (6 * g) + b;
+                format!("38;5;{}", val)
+            },
+            Color::Grayscale(v) => {
+                let val = (v / 24) + 232;
+                format!("48;5;{}", val)
+            }
         }
     }
     
-    pub fn bg_code(&self) -> u32 {
-        self.fg_code() + 10
+    pub fn bg_code(&self) -> String {
+        match *self {
+            Color::Black => "40".to_string(),
+            Color::Blue => "44".to_string(),
+            Color::Cyan => "46".to_string(),
+            Color::Green => "42".to_string(),
+            Color::LightBlack => "100".to_string(),
+            Color::LightBlue => "104".to_string(),
+            Color::LightCyan => "106".to_string(),
+            Color::LightGreen => "102".to_string(),
+            Color::LightMagenta => "105".to_string(),
+            Color::LightRed => "101".to_string(),
+            Color::LightWhite => "107".to_string(),
+            Color::LightYellow => "103".to_string(),
+            Color::Magenta => "45".to_string(),
+            Color::Red => "41".to_string(),
+            Color::White => "47".to_string(),
+            Color::Yellow => "103".to_string(),
+            Color::Rgb(r, g, b) => {
+                let r = r >> 6;
+                let g = g >> 6;
+                let b = b >> 6;
+                let val = 16 + (36 * r) + (6 * g) + b;
+                format!("48;5;{}", val)
+            },
+            Color::Grayscale(v) => {
+                let val = (v / 24) + 232;
+                format!("48;5;{}", val)
+            }
+        }
     }
 }
 #[derive(Clone, Copy, Debug)]

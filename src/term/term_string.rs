@@ -43,16 +43,46 @@ impl TermString {
             Foreground(Color)
         }
 
+        named!(grayscale <&str, Color >, 
+                delimited!(tag_s!(":"),
+                chain!(
+                    tag_s!("Grayscale(") ~
+                    v: take_until_s!(")") ~
+                    tag_s!(")"),
+                    || {
+                        let v:u8 = v.parse().unwrap();
+
+                        Color::Grayscale(v)
+                    }), tag_s!(";")));
+
+        named!(rgb <&str, Color >, 
+                delimited!(tag_s!(":"),
+                chain!(
+                    tag_s!("Rgb(") ~
+                    r: take_until_s!(",") ~
+                    tag_s!(",") ~
+                    g: take_until_s!(",") ~
+                    tag_s!(",") ~
+                    b: take_until_s!(")") ~
+                    tag_s!(")"),
+                    || {
+                        let r:u8 = r.parse().unwrap();
+                        let g:u8 = g.parse().unwrap();
+                        let b:u8 = b.parse().unwrap();
+
+                        Color::Rgb(r, g, b)
+                    }), tag_s!(";")));
+
         named!(color <&str, Color >, map!(
                 delimited!(tag_s!(":"), take_until_s!(";"), tag_s!(";")),
                 color_map));
 
         named!(background<&str, ColorType >, map!(
-                preceded!(tag_s!("background"), color), 
+                preceded!(tag_s!("background"), alt_complete!(rgb | grayscale | color)), 
                 |c| ColorType::Background(c) ));
 
         named!(foreground<&str, ColorType >, map!(
-                preceded!(tag_s!("color"), color), 
+                preceded!(tag_s!("color"), alt_complete!(rgb | grayscale | color)), 
                 |c| ColorType::Foreground(c) ));
 
         named!(color_block<&str, (Option<Color>, Option<Color>) >, map!(
