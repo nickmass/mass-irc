@@ -82,59 +82,59 @@ impl Glyph {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Point(pub u32, pub u32);
+pub struct Point(pub i32, pub i32);
 
 impl Point {
-    pub fn x(&self) -> u32 {
+    pub fn x(&self) -> i32 {
         self.0
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> i32 {
         self.1
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Rect(pub Point, pub u32, pub u32);
+pub struct Rect(pub Point, pub i32, pub i32);
 
 impl Rect {
-    pub fn x(&self) -> u32 {
+    pub fn x(&self) -> i32 {
         self.0.x()
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> i32 {
         self.0.y()
     }
 
-    pub fn left(&self) -> u32 {
+    pub fn left(&self) -> i32 {
         self.0.x()
     }
 
-    pub fn right(&self) -> u32 {
+    pub fn right(&self) -> i32 {
         self.0.x() + self.1
     }
 
-    pub fn top(&self) -> u32 {
+    pub fn top(&self) -> i32 {
         self.0.y()
     }
 
-    pub fn bottom(&self) -> u32 {
+    pub fn bottom(&self) -> i32 {
         self.0.y() + self.2
     }
 
-    pub fn width(&self) -> u32 {
+    pub fn width(&self) -> i32 {
         self.1
     }
 
-    pub fn height(&self) -> u32 {
+    pub fn height(&self) -> i32 {
         self.2
     }
 
-    pub fn horizontal(&self) -> ::std::ops::Range<u32> {
+    pub fn horizontal(&self) -> ::std::ops::Range<i32> {
         ::std::ops::Range { start: self.left(), end: self.right() }
     }
 
-    pub fn vertical(&self) -> ::std::ops::Range<u32> {
+    pub fn vertical(&self) -> ::std::ops::Range<i32> {
         ::std::ops::Range { start: self.top(), end: self.bottom() }
     }
 }
@@ -170,7 +170,8 @@ impl Surface {
     pub fn set_color(&mut self, p: Point, fg: Option<Color>, bg: Option<Color>) {
         let x = p.x() as usize;
         let y = p.y() as usize;
-        if p.y() < self.area.height() && p.x() < self.area.width() {
+        if p.y() < self.area.height() && p.x() < self.area.width() &&
+           p.y() >= 0 && p.x() >= 0 {
             self.buf[(y * self.area.width() as usize ) + x] =
                 Glyph(self.get_char(p), fg, bg);
         }
@@ -191,7 +192,7 @@ impl Surface {
 
     pub fn formatted_text(&mut self, text: TermString, dest: Point) {
         for i in 0..text.len() {
-            let x = i as u32;
+            let x = i as i32;
             if x + dest.x() >= self.rect().width() { break; }
             self.set_glyph(text.get(i).unwrap(), Point(x + dest.x(), dest.y()));
         }
@@ -199,7 +200,7 @@ impl Surface {
 
     pub fn text(&mut self, text: &str, dest: Point) {
         for i in 0..text.len() {
-            let x = i as u32;
+            let x = i as i32;
             if x + dest.x() >= self.rect().width() { break; }
             self.set_char(text.chars().nth(i).unwrap(), Point(x + dest.x(), dest.y()));
         }
@@ -221,7 +222,8 @@ impl Surface {
     fn set_glyph(&mut self, val: Glyph, p: Point) {
         let x = p.x() as usize;
         let y = p.y() as usize;
-        if p.y() < self.area.height() && p.x() < self.area.width() {
+        if p.y() < self.area.height() && p.x() < self.area.width() &&
+           p.y() >= 0 && p.x() >= 0 {
             self.buf[(y * self.area.width() as usize ) + x] = val;
         }
     }
@@ -231,7 +233,8 @@ impl Surface {
         let y = p.y() as usize;
         let width = self.area.width() as usize;
         let ind = (y * width) + x;
-        if p.y() < self.area.height() && p.x() < self.area.width() && ind < self.buf.len() {
+        if p.y() < self.area.height() && p.x() < self.area.width() &&
+           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 && ind >= 0 {
             self.buf[(y * width) + x]
         } else {
             Glyph(' ', None, None)
@@ -240,7 +243,8 @@ impl Surface {
     fn set_char(&mut self, val: char, p: Point) {
         let x = p.x() as usize;
         let y = p.y() as usize;
-        if p.y() < self.area.height() && p.x() < self.area.width() {
+        if p.y() < self.area.height() && p.x() < self.area.width() && 
+           p.y() >= 0 && p.x() >= 0 {
             self.buf[(y * self.area.width() as usize ) + x] = Glyph(val, None, None);
         }
     }
@@ -250,7 +254,8 @@ impl Surface {
         let y = p.y() as usize;
         let width = self.area.width() as usize;
         let ind = (y * width) + x;
-        if p.y() < self.area.height() && p.x() < self.area.width() && ind < self.buf.len() {
+        if p.y() < self.area.height() && p.x() < self.area.width() &&
+           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 && ind >= 0 {
             self.buf[(y * width) + x].0
         } else {
             ' '
@@ -277,15 +282,15 @@ impl TermBuffer {
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 
-    pub fn height(&self) -> u32 { self.surface.rect().height() }
-    pub fn width(&self) -> u32 { self.surface.rect().width() }
+    pub fn height(&self) -> i32 { self.surface.rect().height() }
+    pub fn width(&self) -> i32 { self.surface.rect().width() }
 
     pub fn rect(&self) -> Rect { self.surface.rect() }
 
     fn init(&mut self) {
         let size  = terminal_size().unwrap();
-        let width = size.0 as u32;
-        let height = size.1 as u32;
+        let width = size.0 as i32;
+        let height = size.1 as i32;
         if width != self.width() || height != self.height() {
             self.set_dirty();
             self.surface = Surface::new(Rect(Point(0, 0), width, height));

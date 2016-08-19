@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 pub struct TextInput {
     history: VecDeque<Vec<u8>>,
     history_index: usize,
-    cursor: u32,
+    cursor: i32,
     dirty: bool,
     reader: KeyReader,
 }
@@ -42,19 +42,19 @@ impl TextInput {
                             if self.history_index + 1 < self.history.len() {
                                 self.set_dirty();
                                 self.history_index += 1;
-                                self.cursor = self.history[self.history_index].len() as u32;
+                                self.cursor = self.history[self.history_index].len() as i32;
                             }
                         },
                         Key::Down => {
                             if self.history_index > 0 {
                                 self.set_dirty();
                                 self.history_index -= 1;
-                                self.cursor = self.history[self.history_index].len() as u32;
+                                self.cursor = self.history[self.history_index].len() as i32;
                             }
 
                         },
                         Key::Right => {
-                            let len = self.history[self.history_index].len() as u32;
+                            let len = self.history[self.history_index].len() as i32;
                             if self.cursor + 1 <= len {
                                 self.set_dirty();
                                 self.cursor += 1;
@@ -68,7 +68,7 @@ impl TextInput {
                         },
                         Key::Ins => {},
                         Key::Del => {
-                            let len = self.history[self.history_index].len() as u32;
+                            let len = self.history[self.history_index].len() as i32;
                             if self.cursor < len {
                                 self.set_dirty();
                                 self.cursor += 1;
@@ -81,7 +81,7 @@ impl TextInput {
                         },
                         Key::End => {
                             self.set_dirty();
-                            let len = self.history[self.history_index].len() as u32;
+                            let len = self.history[self.history_index].len() as i32;
                             self.cursor = len;
                         },
                         Key::PageUp => {},
@@ -133,7 +133,7 @@ impl TextInput {
     }
 
     fn type_character(&mut self, c: u8) {
-        let len = self.history[self.history_index].len() as u32;
+        let len = self.history[self.history_index].len() as i32;
         if self.cursor <= len {
             self.set_dirty();
             self.history[self.history_index].insert(self.cursor as usize, c);
@@ -169,7 +169,7 @@ impl TextInput {
         self.dirty = false;
     }
 
-    fn get_render_offset(&self, width: u32) -> u32 {
+    fn get_render_offset(&self, width: i32) -> i32 {
         if self.cursor > width - 3 {
             self.cursor - (width - 3)
         } else {
@@ -177,7 +177,7 @@ impl TextInput {
         }
     }
 
-    pub fn get_display_cursor(&self, window: &TermBuffer) -> u32 {
+    pub fn get_display_cursor(&self, window: &TermBuffer) -> i32 {
         let width = window.width();
         self.cursor - self.get_render_offset(width)
     }

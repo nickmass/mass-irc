@@ -223,7 +223,7 @@ impl TabBar {
             } else {
                 break;
             }
-            i += tab_str.len() as u32;
+            i += tab_str.len() as i32;
             surf.set_color(Point(i, 0), Some(Color::White), Some(Color::Black));
         }
         window.blit(&surf, Point(0,0));

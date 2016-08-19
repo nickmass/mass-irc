@@ -6,7 +6,7 @@ use term::buffer::Glyph;
 pub struct MessagePane {
     messages: Vec<(Option<TabToken>, Message)>,
     dirty: bool,
-    width: u32,
+    width: i32,
 }
 
 impl MessagePane {
@@ -59,9 +59,9 @@ impl MessagePane {
 
         let mut h = (height - 3) as i32;
         for m in tab_messages.rev() {
-            h -= m.1.height as i32;
             if h < 0 { break; }
-            rendered_msgs.blit(&m.1.surface, Point(0, h as u32));
+            h -= m.1.height as i32;
+            rendered_msgs.blit(&m.1.surface, Point(0, h));
         }
         
         window.blit(&rendered_msgs, Point(0,2));
@@ -70,8 +70,8 @@ impl MessagePane {
 }
 
 struct Message {
-    width: u32,
-    height: u32,
+    width: i32,
+    height: i32,
     name: Option<String>,
     message: String,
     index: u32,
@@ -79,8 +79,8 @@ struct Message {
 }
 
 impl Message {
-    pub fn from_server(width: u32, index: u32, message: String) -> Message {
-        let msg_len = message.len() as u32;
+    pub fn from_server(width: i32, index: u32, message: String) -> Message {
+        let msg_len = message.len() as i32;
 
         let height = if msg_len % width == 0 {
             msg_len / width
@@ -96,7 +96,7 @@ impl Message {
         };
 
         let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
-        let mut char_count = chars.len() as u32;
+        let mut char_count = chars.len() as i32;
         for i in 0..height {
             let mut line_buf = String::from(line_color);
             let line_width = if width < char_count {
@@ -126,11 +126,11 @@ impl Message {
         }
     }
 
-    pub fn from_chat(width: u32, index: u32, name: String, message: String)
+    pub fn from_chat(width: i32, index: u32, name: String, message: String)
             -> Message {
         let name_width = 14;
         let msg_width = width - name_width;
-        let msg_len = message.len() as u32;
+        let msg_len = message.len() as i32;
 
         let height = if msg_len % msg_width == 0 {
             msg_len / msg_width
@@ -155,7 +155,7 @@ impl Message {
         };
         
         let chars: Vec<char> = message.chars().collect();
-        let mut char_count = chars.len() as u32;
+        let mut char_count = chars.len() as i32;
         for i in 0..height {
             let mut line_buf = String::from(line_color);
             let line_width = if msg_width < char_count {
@@ -185,7 +185,7 @@ impl Message {
         }
     }
     
-    fn resize(&self, width: u32) -> Message {
+    fn resize(&self, width: i32) -> Message {
         match self.name.clone() {
             Some(name) => {
                 Message::from_chat(width, self.index, name, self.message.clone())
@@ -196,7 +196,7 @@ impl Message {
         }
     }
 
-    fn format_name(nick: &str, width: u32) -> String {
+    fn format_name(nick: &str, width: i32) -> String {
         let color_options: [&'static str; 12] = 
             [ "Blue",
             "Cyan" ,
@@ -226,7 +226,7 @@ pub enum FlowDirection {
 pub struct TextWindow {}
 
 impl TextWindow {
-    pub fn render(text: TermString, width: u32, height: u32, dir: FlowDirection) -> Surface {
+    pub fn render(text: TermString, width: i32, height: i32, dir: FlowDirection) -> Surface {
         let mut surface = Surface::new(Rect(Point(0,0), width, height));
         let mut wrapped_buf = Vec::new();
         let mut current_line = TermString::new();
