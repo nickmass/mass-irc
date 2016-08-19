@@ -189,7 +189,7 @@ impl TabBar {
         let width = window.width();
         let mut surf = Surface::new(Rect(Point(0,0), width, 2));
         let mut i = 0;
-        let active_tab = self.active_tab().unwrap_or(TabToken(9999999));
+        let active_tab = self.active_tab().unwrap_or(TabToken::none());
         for (index, tab) in &mut self.tabs.iter_mut().enumerate() {
             let tab_str = tab.to_string(index as u32 + 1);
             let status = tab.get_status();

@@ -132,7 +132,7 @@ impl CommandParser {
                     || trailing.to_string()));
 
         named!(trailing_empty<&str, String >, map!(tag_s!(" :"),
-                                |x| "".to_string()));
+                                |_| "".to_string()));
 
         named!(params<&str, Params >,
                chain!(

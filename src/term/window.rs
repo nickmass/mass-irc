@@ -33,12 +33,19 @@ impl ChatWindows {
         }
     }
 
-    pub fn add_chat_message(&mut self, target: String, from: &str, msg: &str) {
+    pub fn add_chat_message(&mut self, target: String, from: &str, to: &str,  msg: &str) {
         match self.find_tab(&target) {
             Some(wt) => {
                 let ref win = self.windows[&wt];
                 self.message_pane.add_chat_message(Some(win.tab),
-                from.to_string(), msg.to_string());
+                    from.to_string(), msg.to_string());
+                if Some(win.tab) != self.tab_bar.active_tab() {
+                    if msg.contains(to) {
+                        self.tab_bar.set_alert(win.tab)
+                    } else {
+                        self.tab_bar.set_unread(win.tab);
+                    }
+                }
             },
             None => {
             
@@ -179,7 +186,15 @@ impl ChatWindows {
             None => {}
         }
     }
-    
+
+    pub fn scroll_up(&mut self) {
+        self.message_pane.scroll_up();
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.message_pane.scroll_down();
+    }
+
     fn remove_window(&mut self, wt: &WindowToken) {
         {
             let ref window = self.windows[wt];

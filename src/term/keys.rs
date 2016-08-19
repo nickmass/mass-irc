@@ -75,7 +75,7 @@ impl KeyReader {
                     b"\x1b[7~" => Some(Key::Home),
                     b"\x1b[8~" => Some(Key::End),
                     _ => {
-                        let esc = self.escape_buf.pop_front().unwrap();
+                        let _ = self.escape_buf.pop_front().unwrap();
                         while self.escape_buf.len() != 0 {
                             let c = self.escape_buf.pop_back().unwrap();
                             self.read_buf.push_front(c);

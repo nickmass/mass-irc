@@ -121,7 +121,6 @@ impl TermString {
                 }
                 ));
 
-        use nom::{eof};
         named!(term_string<&str, TermString>, chain!(
                 res: many0!(color_span),
                 || {

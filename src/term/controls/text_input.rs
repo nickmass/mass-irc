@@ -84,8 +84,8 @@ impl TextInput {
                             let len = self.history[self.history_index].len() as i32;
                             self.cursor = len;
                         },
-                        Key::PageUp => {},
-                        Key::PageDown => {},
+                        Key::PageUp => { return Some(UserInput::ScrollUp); },
+                        Key::PageDown => { return Some(UserInput::ScrollDown); },
                         Key::Backspace => {
                             self.delete_character();
                         },

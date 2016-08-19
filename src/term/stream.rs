@@ -1,5 +1,4 @@
 use mio::{would_block};
-use termion::input::{TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{async_stdin, AsyncReader};
 use tokio::io::Readiness;

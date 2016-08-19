@@ -275,7 +275,7 @@ impl Surface {
         let width = self.area.width() as usize;
         let ind = (y * width) + x;
         if p.y() < self.area.height() && p.x() < self.area.width() &&
-           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 && ind >= 0 {
+           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 {
             self.buf[(y * width) + x]
         } else {
             Glyph(' ', None, None)
@@ -296,7 +296,7 @@ impl Surface {
         let width = self.area.width() as usize;
         let ind = (y * width) + x;
         if p.y() < self.area.height() && p.x() < self.area.width() &&
-           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 && ind >= 0 {
+           ind < self.buf.len() && p.y() >= 0 && p.x() >= 0 {
             self.buf[(y * width) + x].0
         } else {
             ' '

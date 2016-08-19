@@ -1,4 +1,3 @@
-use irc::Command;
 use term::{TabToken, TermBuffer, Color, Surface, Point, Rect};
 use term::term_string::TermString;
 use term::buffer::Glyph;
@@ -7,6 +6,7 @@ pub struct MessagePane {
     messages: Vec<(Option<TabToken>, Message)>,
     dirty: bool,
     width: i32,
+    scroll: i32,
 }
 
 impl MessagePane {
@@ -15,6 +15,7 @@ impl MessagePane {
             messages: Vec::new(),
             dirty: true,
             width: 0, //I don't like this
+            scroll: 0,
         }
     }
 
@@ -40,6 +41,16 @@ impl MessagePane {
         self.messages.push((tab, message));
     }
 
+    pub fn scroll_up(&mut self) {
+        self.scroll += 5;
+        self.set_dirty();
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.scroll -= 5;
+        self.set_dirty();
+    }
+
     pub fn render(&mut self, window: &mut TermBuffer, tab: Option<TabToken>) {
         if self.width != window.width() {
             self.width = window.width();
@@ -47,20 +58,31 @@ impl MessagePane {
             self.messages = self.messages.iter().map(|x| (x.0, x.1.resize(self.width))).collect();
         }
 
-        if !window.is_dirty() && !self.is_dirty() { return }
+        if !window.is_dirty() && !self.is_dirty() { return; }
 
-        let tab_messages = self.messages.iter().filter(|x| x.0 == tab);
-        
-        let height = window.height();
+        let height = window.height() - 3;
         let width = window.width();
 
-        let mut rendered_msgs = Surface::new(Rect(Point(0, 0), width, height - 3));
+        let total_height = self.messages.iter().filter(|x| x.0 == tab)
+                                        .fold(0, |acc, x| acc + x.1.height);
+        let max_scroll = total_height - height;
+
+        if max_scroll < 0 { self.scroll = 0; }
+        if self.scroll < 0 { self.scroll = 0; }
+        if self.scroll > max_scroll { self.scroll = max_scroll;}
+
+        let mut tab_messages = self.messages.iter().filter(|x| x.0 == tab);
+
+        let mut rendered_msgs = Surface::new(Rect(Point(0, 0), width, height));
         rendered_msgs.set_color(Point(0,0), Some(Color::White), Some(Color::Black));
 
-        let mut h = (height - 3) as i32;
+        let mut rendered_height = 0;
+        let mut h = height;
         for m in tab_messages.rev() {
-            if h < 0 { break; }
-            h -= m.1.height as i32;
+            rendered_height += m.1.height;
+            if rendered_height < self.scroll {continue;}
+            if self.scroll + height < rendered_height { break; }
+            h -= m.1.height;
             rendered_msgs.blit(&m.1.surface, Point(0, h));
         }
         
@@ -80,8 +102,8 @@ struct Message {
 
 impl Message {
     pub fn from_server(width: i32, index: u32, message: String) -> Message {
-        let msg_len = message.len() as i32;
-
+        let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
+        let msg_len = chars.len() as i32;
         let height = if msg_len % width == 0 {
             msg_len / width
         } else {
@@ -95,8 +117,7 @@ impl Message {
             "\0color:White;background:Grayscale(25);\0"
         };
 
-        let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
-        let mut char_count = chars.len() as i32;
+        let mut char_count = msg_len as i32;
         for i in 0..height {
             let mut line_buf = String::from(line_color);
             let line_width = if width < char_count {
@@ -109,9 +130,6 @@ impl Message {
             let end = start + line_width as usize;
             for c in &chars[start..end] {
                 line_buf.push(*c);
-            }
-            for i in 0..width-line_width {
-                line_buf.push(' ');
             }
             surface.formatted_text(line_buf.into(), Point(0, i));
         }
@@ -168,9 +186,6 @@ impl Message {
             let end = start + line_width as usize;
             for c in &chars[start..end] {
                 line_buf.push(*c);
-            }
-            for i in 0..msg_width-line_width {
-                line_buf.push(' ');
             }
             surface.formatted_text(line_buf.into(), Point(name_width, i));
         }

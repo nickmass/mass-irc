@@ -1,7 +1,7 @@
 use mio::timer::Builder;
 use mio::channel::{sync_channel as mio_sync_channel, SyncSender as MioSyncSender};
 
-use irc::{Irc, Command, UserCommand, CommandType, ClientEvent, CommandBuilder, ClientTunnel};
+use irc::{Irc, UserCommand, CommandType, ClientEvent, CommandBuilder, ClientTunnel};
 
 use tokio::util::channel::Receiver as TokioReceiver;
 use tokio::util::timer::Timer;
@@ -53,7 +53,7 @@ pub struct ClientTask {
 }
 
 impl ClientTask  {
-    fn new(stream: TcpStream, mut timer: Timer<()>, tunnel: InnerTunnel) -> ClientTask {
+    fn new(stream: TcpStream, timer: Timer<()>, tunnel: InnerTunnel) -> ClientTask {
         ClientTask {
             server: Irc::new(stream),
             timer: timer,
@@ -66,7 +66,7 @@ impl ClientTask  {
 impl Task for ClientTask {
     fn tick(&mut self) -> io::Result<Tick> {
         if self.tick == 1 {
-            self.tunnel.try_write(ClientEvent::Connected);
+            let _ = self.tunnel.try_write(ClientEvent::Connected);
         }
         if let Some(frame) = try!(self.server.read()) {
             match frame {
@@ -88,7 +88,7 @@ impl Task for ClientTask {
                             Some(ev) => { let _ = self.tunnel.try_write(ev); },
                             _ => {  },
                         }
-                        self.tunnel.try_write(ClientEvent::Command(msg));
+                        let _ = self.tunnel.try_write(ClientEvent::Command(msg));
                     }
                 },
                 _ => {}
@@ -99,7 +99,7 @@ impl Task for ClientTask {
         match self.tunnel.try_read() {
             Ok(Some(d)) => {
                 let command = d.to_command().unwrap();
-                self.tunnel.try_write(ClientEvent::Command(command.clone()));
+                let _ = self.tunnel.try_write(ClientEvent::Command(command.clone()));
                 match command.command {
                     CommandType::PrivMsg => {
                         match ClientEvent::from_command(&command) {

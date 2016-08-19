@@ -21,6 +21,8 @@ pub enum UserInput {
     SetTab(u32),
     PrevTab,
     NextTab,
+    ScrollUp,
+    ScrollDown,
 }
 
 pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
@@ -68,6 +70,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                         self.chat.add_chat_message(channel,
                                               sender.as_ref().map(|x| &**x)
                                                 .unwrap_or(&*self.nickname),
+                                              &*self.nickname,
                                               &message);
                     },
                     Ok(Some(ClientEvent::JoinChannel(channel, sender))) => {
@@ -99,6 +102,12 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                 },
                 Some(UserInput::NextTab) => {
                     self.chat.next_tab();
+                },
+                Some(UserInput::ScrollUp) => {
+                    self.chat.scroll_up();
+                },
+                Some(UserInput::ScrollDown) => {
+                    self.chat.scroll_down();
                 },
                 Some(UserInput::Text(s)) => {
                     let channel = self.chat.active_channel();
