@@ -15,6 +15,8 @@ use irc::{ClientEvent, UserInputParser, UserCommand, ClientTunnel, ClientSender,
 use std::thread;
 use std::time::Duration;
 
+use log;
+
 pub enum UserInput {
     Close,
     Text(String),
@@ -33,6 +35,7 @@ pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
     text_input: TextInput,
     nickname: String,
     realname: String,
+    error_recv: Option<Receiver<String>>,
 }
 
 impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=ClientEvent> {
@@ -46,6 +49,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             text_input: TextInput::new(),
             nickname: nickname,
             realname: realname,
+            error_recv: None,
         };
         
         term
@@ -114,10 +118,19 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
 
                     match UserInputParser::parse(s, channel) {
                         Ok(msg) => { let _ = self.tunnel.write(msg); },
-                        Err(_) =>{ unimplemented!(); },
+                        Err(_) =>{ error!("Unknown command") },
                     }
                 },
                 _ => (),
+            }
+
+            if self.error_recv.is_some() {
+                match self.error_recv.as_ref().unwrap().try_recv() {
+                    Ok(msg) => {
+                        self.chat.add_server_message(msg);
+                    },
+                    _ => {}
+                }
             }
 
 
@@ -128,6 +141,42 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             self.text_input.set_cursor(&mut self.stream, &self.window);
 
             thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    pub fn init_log(&mut self) -> Result<(), log::SetLoggerError> {
+        let (tx, rx) = channel();
+        self.error_recv = Some(rx);
+        log::set_logger(|max_log_level| {
+            max_log_level.set(log::LogLevelFilter::Error);
+            Box::new(TerminalLogger::new(tx))
+        })
+    }
+}
+
+struct TerminalLogger {
+    log_sink: Arc<Mutex<Sender<String>>>,
+}
+
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::{Arc, Mutex};
+
+
+impl TerminalLogger {
+    fn new(log_sink: Sender<String>) -> TerminalLogger {
+        TerminalLogger { log_sink: Arc::new(Mutex::new(log_sink)) }
+    }
+}
+
+impl log::Log for TerminalLogger {
+    fn enabled(&self, metadata: &log::LogMetadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::LogRecord) {
+        if self.enabled(record.metadata()) {
+            self.log_sink.lock().unwrap().send(
+                format!("{} :{}", record.level(), record.args()));
         }
     }
 }

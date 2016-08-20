@@ -5,7 +5,6 @@ extern crate mio;
 extern crate nom;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate tokio;
 extern crate termion;
 
@@ -24,8 +23,6 @@ use term::Terminal;
 mod tests;
 
 fn main() {
-    env_logger::LogBuilder::new().parse("mass_irc=debug").init().unwrap();
-
     let matches = App::new("Mass-IRC")
                 .version("0.0.1")
                 .author("Nick Massey <nickmass@nickmass.com>")
@@ -94,5 +91,6 @@ fn main() {
     let client = Client::new();
     let tunnel = client.connect(format!("{}:{}", ip.ip(), port).parse().unwrap());
     let mut terminal = Terminal::new(tunnel, nick.to_string(), realname.to_string());
+    let _ = terminal.init_log();
     terminal.run();
 }
