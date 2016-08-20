@@ -108,6 +108,7 @@ impl TabBar {
         let token = TabToken(self.next_id);
         self.tabs.push(Tab::new(token, title, topic, status, self.tick));
         self.next_id += 1;
+        self.set_dirty();
 
         token
     }
@@ -117,6 +118,7 @@ impl TabBar {
                 .find(|x| x.token == tab) {
             tab.set_topic(topic);
         }
+        self.set_dirty();
     }
 
     pub fn remove_tab(&mut self, token: TabToken) {
@@ -131,6 +133,7 @@ impl TabBar {
                     self.tabs[tab_index - 1].set_status(TabStatus::Active);
                 }
             }
+            self.set_dirty();
         }
     }
 
@@ -147,44 +150,57 @@ impl TabBar {
         for tab in self.tabs.iter_mut().filter(|x| x.get_status() == TabStatus::Active) {
             tab.set_status(TabStatus::Read);
         }
+        self.set_dirty();
     }
 
     pub fn set_active(&mut self, tab: TabToken) {
-        self.clear_active();
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab);
-        if let Some(tab) = tab {
-            tab.set_status(TabStatus::Active);
+        {
+            self.clear_active();
+            let tab = self.tabs.iter_mut().find(|x| x.token == tab);
+            if let Some(tab) = tab {
+                tab.set_status(TabStatus::Active);
+            }
         }
+        self.set_dirty();
     }
 
     pub fn set_read(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
-        if let Some(tab) = tab {
-            tab.set_status(TabStatus::Read);
+        {
+            let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
+            if let Some(tab) = tab {
+                tab.set_status(TabStatus::Read);
+            }
         }
+        self.set_dirty();
     }
 
     pub fn set_unread(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status == TabStatus::Read);
-        if let Some(tab) = tab {
-            tab.set_status(TabStatus::Unread);
+        {
+            let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status == TabStatus::Read);
+            if let Some(tab) = tab {
+                tab.set_status(TabStatus::Unread);
+            }
         }
+        self.set_dirty();
     }
 
     pub fn set_alert(&mut self, tab: TabToken) {
-        let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
-        if let Some(tab) = tab {
-            tab.set_status(TabStatus::Alert);
+        {
+            let tab = self.tabs.iter_mut().find(|x| x.token == tab && x.status != TabStatus::Active);
+            if let Some(tab) = tab {
+                tab.set_status(TabStatus::Alert);
+            }
         }
+        self.set_dirty();
     }
 
     pub fn render(&mut self, window: &mut TermBuffer) {
         self.tick = self.tick.wrapping_add(1);
-        let mut dirty = self.dirty;
+        let mut dirty = self.is_dirty();
         for tab in &mut self.tabs {
             dirty = dirty | tab.tick(self.tick);
         }
-        if !window.is_dirty() && !dirty { return; }
+        if !window.is_invalid() && !dirty { return; }
 
         let width = window.width();
         let mut surf = Surface::new(Rect(Point(0,0), width, 2));
@@ -227,5 +243,6 @@ impl TabBar {
             surf.set_color(Point(i, 0), Some(Color::White), Some(Color::Black));
         }
         window.blit(&surf, Point(0,0));
+        self.dirty = false;
     }
 }

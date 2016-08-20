@@ -120,10 +120,8 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                 _ => (),
             }
 
-            if self.window.is_dirty() {
-                self.text_input.set_dirty();
-            }
 
+            self.window.init();
             self.text_input.render(&mut self.window);
             self.chat.render(&mut self.window);
             self.window.render(&mut self.stream);

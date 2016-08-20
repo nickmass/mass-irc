@@ -150,7 +150,7 @@ impl TextInput {
     }
 
     pub fn render(&mut self, window: &mut TermBuffer) {
-        if !window.is_dirty() && !self.is_dirty() { return; }
+        if !window.is_invalid() && !self.is_dirty() { return; }
 
         let height = window.height();
         let width = window.width();

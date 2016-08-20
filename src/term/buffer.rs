@@ -307,6 +307,7 @@ impl Surface {
 pub struct TermBuffer {
     surface: Surface,
     dirty: bool,
+    invalid: bool,
 }
 
 impl TermBuffer {
@@ -314,12 +315,16 @@ impl TermBuffer {
         let mut buf = TermBuffer {
             surface: Surface::new(Rect(Point(0, 0), 0, 0)),
             dirty: true,
+            invalid: true,
         };
 
         buf.init();
         buf
     }
 
+    pub fn set_invalid(&mut self) { self.invalid = true; }
+    pub fn is_invalid(&self) -> bool { self.invalid }
+    
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 
@@ -328,11 +333,12 @@ impl TermBuffer {
 
     pub fn rect(&self) -> Rect { self.surface.rect() }
 
-    fn init(&mut self) {
+    pub fn init(&mut self) {
         let size  = terminal_size().unwrap();
         let width = size.0 as i32;
         let height = size.1 as i32;
         if width != self.width() || height != self.height() {
+            self.set_invalid();
             self.set_dirty();
             self.surface = Surface::new(Rect(Point(0, 0), width, height));
         }
@@ -361,6 +367,7 @@ impl TermBuffer {
         
         let _ = stream.flush();
         self.dirty = false;
+        self.invalid = false;
         self.init();
     }
 }
