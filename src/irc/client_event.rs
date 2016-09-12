@@ -7,6 +7,8 @@ pub enum ClientEvent {
     LeaveChannel(String, Option<String>),
     NoticeMessage(String, Option<String>, String),
     Topic(String, String),
+    Names(String, Vec<String>),
+    NamesEnd(String),
     Command(Command),
     Connected,
 }
@@ -56,6 +58,16 @@ impl ClientEvent {
             CommandType::Rpl_NoTopic => {
                 let target = command.get_param(1).unwrap_or("ERROR").to_string();
                 Some(ClientEvent::Topic(target, "".to_string()))
+            },
+            CommandType::Rpl_NamReply => {
+                let target = command.get_param(2).unwrap_or("ERROR").to_string();
+                let last = command.get_param(3).unwrap_or("ERROR");
+                let names = last.split(' ').map(|x|x.to_string()).collect();
+                Some(ClientEvent::Names(target, names))
+            },
+            CommandType::Rpl_EndOfNames => {
+                let target = command.get_param(1).unwrap_or("ERROR").to_string();
+                Some(ClientEvent::NamesEnd(target))
             },
             _ => None
         }

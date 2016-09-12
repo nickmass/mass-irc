@@ -78,18 +78,30 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                                               &message);
                     },
                     Ok(Some(ClientEvent::JoinChannel(channel, sender))) => {
-                        if sender.unwrap_or("".to_string()) == self.nickname {
+                        let sender = sender.unwrap_or("".to_string());
+                        if sender == self.nickname {
                             self.chat.add_channel(channel);
+                        } else {
+                            self.chat.add_name(channel, sender);
                         }
                     },
                     Ok(Some(ClientEvent::LeaveChannel(channel, sender))) => {
-                        if sender.unwrap_or("".to_string()) == self.nickname {
+                        let sender = sender.unwrap_or("".to_string());
+                        if sender == self.nickname {
                             self.chat.remove_channel(&channel);
+                        } else {
+                            self.chat.remove_name(channel, sender);
                         }
                     },
                     Ok(Some(ClientEvent::Topic(channel, topic))) => {
                         self.chat.add_topic(channel, topic);
                     },
+                    Ok(Some(ClientEvent::Names(channel, names))) => {
+                        self.chat.add_names(channel, names);
+                    },
+                    Ok(Some(ClientEvent::NamesEnd(channel))) => {
+                        self.chat.set_names(channel);
+                    }
                     Ok(None) => break,
                     Ok(_) => {},
                     Err(_) => {}

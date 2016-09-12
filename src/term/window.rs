@@ -3,7 +3,8 @@ use term::{TermBuffer};
 
 use std::collections::HashMap;
 
-
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ChannelToken(u32);
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowToken(u32);
 pub struct Window {
@@ -12,11 +13,18 @@ pub struct Window {
     tab: TabToken,
 }
 
+pub struct Channel {
+    name: String,
+    window: WindowToken,
+    users: Vec<String>,
+    new_users: Vec<String>,
+}
+
 pub struct ChatWindows {
     message_pane: MessagePane,
     tab_bar: TabBar,
     next_window: u32,
-    channels: HashMap<String, WindowToken>,
+    channels: Vec<Channel>,
     tabs: HashMap<TabToken, WindowToken>,
     windows: HashMap<WindowToken, Window>,
 }
@@ -27,7 +35,7 @@ impl ChatWindows {
             message_pane: message_pane,
             tab_bar: tab_bar,
             next_window: 0,
-            channels: HashMap::new(),
+            channels: Vec::new(),
             tabs: HashMap::new(),
             windows: HashMap::new(),
         }
@@ -160,7 +168,10 @@ impl ChatWindows {
         self.next_window += 1;
         let window = WindowToken(self.next_window);
         self.tabs.insert(tab.clone(), window.clone());
-        self.channels.insert(channel.clone(), window.clone());
+        self.channels.push( Channel { name: channel.clone(),
+                                      window: window.clone(),
+                                      users: Vec::new(),
+                                      new_users: Vec::new()});
         self.windows.insert(window, Window { token: window, name: channel, tab: tab});
         self.message_pane.set_dirty();
     }
@@ -187,6 +198,37 @@ impl ChatWindows {
         }
     }
 
+    pub fn add_names(&mut self, target: String, mut names: Vec<String>) {
+        if let Some(chan) = self.channels.iter_mut().find(|x|x.name == target) {
+            chan.new_users.append(&mut names);
+        }
+    }
+
+    pub fn set_names(&mut self, target: String) {
+        if let Some(chan) = self.channels.iter_mut().find(|x|x.name == target) {
+            for name in &mut chan.new_users {
+                if name.starts_with('@') || name.starts_with('+') { name.remove(0); }
+            }
+            chan.users.append(&mut chan.new_users);
+        } 
+    }
+
+    pub fn add_name(&mut self, target: String, mut name: String) {
+        if let Some(chan) = self.channels.iter_mut().find(|x|x.name == target) {
+            if name.starts_with('@') || name.starts_with('+') { name.remove(0); }
+            chan.users.push(name);
+        }
+    }
+
+    pub fn remove_name(&mut self, target: String, mut name: String) {
+        if let Some(chan) = self.channels.iter_mut().find(|x|x.name == target) {
+            if name.starts_with('@') || name.starts_with('+') { name.remove(0); }
+            if let Some(pos) = chan.users.iter().position(|x|x == &name) {
+                chan.users.remove(pos);
+            }
+        }
+    }
+
     pub fn scroll_up(&mut self) {
         self.message_pane.scroll_up();
     }
@@ -199,7 +241,9 @@ impl ChatWindows {
         {
             let ref window = self.windows[wt];
             self.tabs.remove(&window.tab);
-            self.channels.remove(&window.name);
+            if let Some(pos) = self.channels.iter().position(|x|x.window == *wt) {
+                self.channels.remove(pos);
+            }
         }
         self.windows.remove(wt);
     }
@@ -214,9 +258,9 @@ impl ChatWindows {
     }
 
     fn find_tab(&self, channel: &str) -> Option<WindowToken> {
-        match self.channels.get(channel) {
-            Some(wt) => {
-                self.windows.get(&wt).map(|x| x.token)
+        match self.channels.iter().find(|x|x.name == channel) {
+            Some(c) => {
+                Some(c.window)
             },
             None => None
         }
