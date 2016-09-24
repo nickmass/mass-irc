@@ -104,13 +104,15 @@ impl Message {
     pub fn from_server(width: i32, index: u32, message: String) -> Message {
         let chars: Vec<char> = message.chars().filter(|x| *x != '\r' && *x != '\n').collect();
         let msg_len = chars.len() as i32;
-        let height = if msg_len % width == 0 {
+        let height = if width == 0 {
+            0
+        } else if msg_len % width == 0 {
             msg_len / width
         } else {
             (msg_len / width) + 1
         };
         let mut surface = Surface::new(Rect(Point(0, 0), width, height));
-        
+
         let line_color = if index % 2 != 0 {
             "\0color:White;background:Grayscale(76);\0"
         } else {
@@ -133,7 +135,7 @@ impl Message {
             }
             surface.formatted_text(line_buf.into(), Point(0, i));
         }
-        
+
         Message {
             width: width,
             height: height,

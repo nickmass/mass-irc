@@ -360,11 +360,11 @@ impl TermBuffer {
         let mut buf = String::new();
 
         for glyph in self.surface.buf() {
-            buf.push_str(&*glyph.to_string());            
+            buf.push_str(&*glyph.to_string());
         }
 
         let _ = stream.write_all(&*format!("\x1b[H\x1b[37;40m{}",buf).into_bytes());
-        
+
         let _ = stream.flush();
         self.dirty = false;
         self.invalid = false;

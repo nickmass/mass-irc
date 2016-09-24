@@ -5,10 +5,8 @@ authors = ["Nick Massey <nickmass@nickmass.com>"]
 
 [dependencies]
 nom = "^1.2.4"
-tokio = { git = "https://github.com/tokio-rs/tokio" }
-futures = "0.1.0"
 log = "0.3"
 env_logger = "0.3"
 termion = "1.0.0"
 clap = "2.10.0"
-mio = { git = "https://github.com/carllerche/mio", branch = "dev" }
+mio = "0.6"

@@ -11,7 +11,7 @@ pub use self::term_string::{TermString};
 mod window;
 use self::window::ChatWindows;
 
-use irc::{ClientEvent, UserInputParser, UserCommand, ClientTunnel, ClientSender, ClientReceiver};
+use irc::{IrcTunnel, ClientEvent, UserInputParser, UserCommand};
 use std::thread;
 use std::time::Duration;
 
@@ -27,8 +27,8 @@ pub enum UserInput {
     ScrollDown,
 }
 
-pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
-    tunnel: ClientTunnel<S, R>,
+pub struct Terminal {
+    tunnel: IrcTunnel,
     stream: TermStream,
     window: TermBuffer,
     chat: ChatWindows,
@@ -38,9 +38,8 @@ pub struct Terminal<S,R> where S: ClientSender, R: ClientReceiver {
     error_recv: Option<Receiver<String>>,
 }
 
-impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceiver<Msg=ClientEvent> {
-    pub fn new(tunnel: ClientTunnel<S, R>, nickname: String, realname: String) ->
-            Terminal<S,R> {
+impl Terminal {
+    pub fn new(tunnel: IrcTunnel, nickname: String, realname: String) -> Terminal {
         let term = Terminal {
             tunnel: tunnel,
             stream: TermStream::new().unwrap(),
@@ -51,33 +50,31 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
             realname: realname,
             error_recv: None,
         };
-        
+
         term
     }
 
     pub fn run(&mut self) {
+        let _ = self.tunnel.0.send(UserCommand::Nick(
+            self.nickname.to_string()));
+        let _ = self.tunnel.0.send(UserCommand::User(
+            self.nickname.to_string(), 
+            "8".to_string(), 
+            self.realname.to_string()));
         loop {
             loop {
-                match self.tunnel.try_read() {
-                    Ok(Some(ClientEvent::Connected)) => {
-                        let _ = self.tunnel.write(UserCommand::Nick(
-                                self.nickname.to_string()));
-                        let _ = self.tunnel.write(UserCommand::User(
-                                self.nickname.to_string(), 
-                                "8".to_string(), 
-                                self.realname.to_string()));
-                    },
-                    Ok(Some(ClientEvent::Command(m))) => {
+                match self.tunnel.1.try_recv() {
+                    Ok(ClientEvent::Command(m)) => {
                         self.chat.add_server_message(m.to_string());
                     },
-                    Ok(Some(ClientEvent::ChannelMessage(channel, sender, message))) => {
+                    Ok(ClientEvent::ChannelMessage(channel, sender, message)) => {
                         self.chat.add_chat_message(channel,
                                               sender.as_ref().map(|x| &**x)
                                                 .unwrap_or(&*self.nickname),
                                               &*self.nickname,
                                               &message);
                     },
-                    Ok(Some(ClientEvent::JoinChannel(channel, sender))) => {
+                    Ok(ClientEvent::JoinChannel(channel, sender)) => {
                         let sender = sender.unwrap_or("".to_string());
                         if sender == self.nickname {
                             self.chat.add_channel(channel);
@@ -85,7 +82,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                             self.chat.add_name(channel, sender);
                         }
                     },
-                    Ok(Some(ClientEvent::LeaveChannel(channel, sender))) => {
+                    Ok(ClientEvent::LeaveChannel(channel, sender)) => {
                         let sender = sender.unwrap_or("".to_string());
                         if sender == self.nickname {
                             self.chat.remove_channel(&channel);
@@ -93,18 +90,17 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                             self.chat.remove_name(channel, sender);
                         }
                     },
-                    Ok(Some(ClientEvent::Topic(channel, topic))) => {
+                    Ok(ClientEvent::Topic(channel, topic)) => {
                         self.chat.add_topic(channel, topic);
                     },
-                    Ok(Some(ClientEvent::Names(channel, names))) => {
+                    Ok(ClientEvent::Names(channel, names)) => {
                         self.chat.add_names(channel, names);
                     },
-                    Ok(Some(ClientEvent::NamesEnd(channel))) => {
+                    Ok(ClientEvent::NamesEnd(channel)) => {
                         self.chat.set_names(channel);
                     }
-                    Ok(None) => break,
                     Ok(_) => {},
-                    Err(_) => {}
+                    Err(_) => break,
                 }
             }
 
@@ -129,7 +125,7 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     let channel = self.chat.active_channel();
 
                     match UserInputParser::parse(s, channel) {
-                        Ok(msg) => { let _ = self.tunnel.write(msg); },
+                        Ok(msg) => { let _ = self.tunnel.0.send(msg); },
                         Err(_) =>{ error!("Unknown command") },
                     }
                 },
@@ -144,7 +140,6 @@ impl<S,R> Terminal<S,R> where S: ClientSender<Msg=UserCommand>, R: ClientReceive
                     _ => {}
                 }
             }
-
 
             self.window.init();
             self.text_input.render(&mut self.window);

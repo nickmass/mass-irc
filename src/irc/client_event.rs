@@ -1,4 +1,5 @@
-use irc::{Sender, Command, CommandType};
+use irc::{Sender, UserCommand, Command, CommandType};
+
 
 pub enum ClientEvent {
     ChannelMessage(String, Option<String>, String),

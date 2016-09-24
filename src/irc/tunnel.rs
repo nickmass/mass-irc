@@ -1,6 +1,5 @@
-use tokio::util::channel as tokio;
-use mio::channel as mio;
-use std::sync::mpsc::*;
+/*
+use tokio_core::channel::{Receiver, TokioSender};
 
 pub struct ClientTunnel<S, R> where S: ClientSender, R: ClientReceiver {
     sender: S,
@@ -34,16 +33,6 @@ pub trait ClientReceiver {
     fn try_read(&self) -> Result<Option<Self::Msg>, TryRecvError>;
 }
 
-impl<T> ClientReceiver for tokio::Receiver<T> {
-    type Msg = T;
-    fn try_read(&self) -> Result<Option<T>, TryRecvError> {
-        match self.recv() {
-            Ok(x) => Ok(x),
-            _ => Err(TryRecvError::Disconnected),
-        }
-    }
-}
-
 impl<T> ClientReceiver for Receiver<T> {
     type Msg = T;
     fn try_read(&self) -> Result<Option<T>, TryRecvError> {
@@ -62,27 +51,7 @@ pub trait ClientSender {
     fn try_write(&self, t:Self::Msg) -> Result<(), TrySendError<Self::Msg>>;
 }
 
-impl<T> ClientSender for mio::SyncSender<T> {
-    type Msg = T;
-    fn write(&self, t: T) -> Result<(), SendError<T>> {
-        match self.send(t) {
-            Ok(_) => Ok(()),
-            Err(mio::SendError::Disconnected(i)) => Err(SendError(i)),
-            _ => unimplemented!(),
-        }
-    }
-
-    fn try_write(&self, t:T) -> Result<(), TrySendError<T>> {
-        match self.try_send(t) {
-            Ok(_) => Ok(()),
-            Err(mio::TrySendError::Full(i))=> Err(TrySendError::Full(i)),
-            Err(mio::TrySendError::Disconnected(i))=> Err(TrySendError::Disconnected(i)),
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl<T> ClientSender for SyncSender<T> {
+impl<T> ClientSender for Sender<T> {
     type Msg = T;
     fn write(&self, t: T) -> Result<(), SendError<T>> {
         match self.send(t) {
@@ -98,3 +67,4 @@ impl<T> ClientSender for SyncSender<T> {
         }
     }
 }
+*/

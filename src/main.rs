@@ -1,11 +1,10 @@
 #![feature(lookup_host)]
 
-extern crate mio;
 #[macro_use]
 extern crate nom;
 #[macro_use]
 extern crate log;
-extern crate tokio;
+extern crate mio;
 extern crate termion;
 
 extern crate clap;
@@ -90,6 +89,7 @@ fn main() {
 
     let client = Client::new();
     let tunnel = client.connect(format!("{}:{}", ip.ip(), port).parse().unwrap());
+
     let mut terminal = Terminal::new(tunnel, nick.to_string(), realname.to_string());
     let _ = terminal.init_log();
     terminal.run();
