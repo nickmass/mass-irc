@@ -124,7 +124,6 @@ impl TextInput {
                 _ => {}
             }
         }
-        
         None
     }
 
@@ -140,7 +139,7 @@ impl TextInput {
             self.cursor += 1;
         }
     }
-    
+
     fn delete_character(&mut self) {
         if self.cursor > 0 {
             self.set_dirty();
@@ -163,9 +162,9 @@ impl TextInput {
         if end > line.len() { end = line.len(); }
 
         surface.text(&line[offset..end], Point(0,0));
-        surface.set_color(Point(0,0), Some(Color::LightBlack), Some(Color::LightWhite)); 
+        surface.set_color(Point(0,0), Some(Color::White), Some(Color::Black)); 
         window.blit(&surface, Point(0, height - 1));
-       
+
         self.dirty = false;
     }
 

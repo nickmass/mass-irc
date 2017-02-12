@@ -58,7 +58,7 @@ impl KeyReader {
             if c.is_none() { return None; }
             let c = c.unwrap();
 
-            if c == b'\x1b' || self.escape_buf.len() != 0 { 
+            if c == b'\x1b' || self.escape_buf.len() != 0 {
                 self.escape_buf.push_back(c);
                 let key = match self.escape_buf.as_slices().0 {
                     b"\x1b"   | b"\x1b["  | b"\x1b[2" |
@@ -88,7 +88,7 @@ impl KeyReader {
                         }
                     }
                 };
-                
+
                 if key == None { continue; }
 
                 self.escape_buf.clear();
@@ -113,7 +113,7 @@ impl KeyReader {
             return key;
         }
     }
-        
+
     fn is_printable(c: u8) -> bool {
         c >= 32 && c <= 127
     }

@@ -15,10 +15,9 @@ pub use self::command_builder::CommandBuilder;
 pub use self::command::{Command, Sender};
 pub use self::command_type::CommandType;
 pub use self::client_event::{ClientEvent};
-pub use self::client::IrcTunnel;
+pub use self::client::Client;
 
-use std::io;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 
 use mio::{Evented, Poll, PollOpt, Ready, Token};
 
