@@ -157,7 +157,7 @@ impl CommandParser {
                                         }));
 
         let r = command_parser(str::from_utf8(message).unwrap());
-        if r.is_err() {
+        if r.is_err() || r.is_incomplete() {
             error!("{}", str::from_utf8(message).unwrap());
             error!("{:?}", r);
         }

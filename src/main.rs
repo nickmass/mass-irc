@@ -28,7 +28,7 @@ fn main() {
                      .long("server")
                      .help("Sets the IRC server to connect to")
                      .takes_value(true)
-                     .default_value("localhost"))
+                     .default_value("127.0.0.1"))
                 .arg(Arg::with_name("port")
                      .short("p")
                      .long("port")

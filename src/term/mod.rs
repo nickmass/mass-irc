@@ -182,7 +182,7 @@ impl log::Log for TerminalLogger {
     fn log(&self, record: &log::LogRecord) {
         if self.enabled(record.metadata()) {
             self.log_sink.lock().unwrap().send(
-                format!("{} :{}", record.level(), record.args()));
+                format!("{}: {} @ {:?}", record.level(), record.args(), record.location()));
         }
     }
 }

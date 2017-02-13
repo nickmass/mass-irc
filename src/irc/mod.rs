@@ -15,7 +15,8 @@ pub use self::command_builder::CommandBuilder;
 pub use self::command::{Command, Sender};
 pub use self::command_type::CommandType;
 pub use self::client_event::{ClientEvent};
-pub use self::client::Client;
+//pub use self::client::Client;
+pub use self::client::tokio::Client;
 
 use std::io::{self, Read, Write};
 
