@@ -2,7 +2,6 @@
 extern crate nom;
 #[macro_use]
 extern crate log;
-extern crate mio;
 extern crate termion;
 
 #[macro_use]

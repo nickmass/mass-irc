@@ -1,296 +1,168 @@
-use irc::{Irc, CLIENT, CLIENT_MSG, UserCommand, CommandType, ClientEvent, CommandBuilder};
+extern crate tokio_core;
+extern crate futures;
 
-use mio::tcp::{TcpStream};
-use mio::channel::{Sender as MioSender, Receiver as MioReceiver, channel as mio_channel};
-use mio::{Poll, PollOpt, Ready, Events};
-
+use self::tokio_core::net::TcpStream;
+use self::tokio_core::io::{Codec, EasyBuf, Io};
+use self::tokio_core::reactor::{Core, Interval};
+use self::futures::{Stream, Future, Sink};
+use self::futures::sync::mpsc::{
+    unbounded as fut_unbounded,
+    UnboundedSender as FutSender,
+};
+use std::io;
 use std::net::ToSocketAddrs;
-use std::thread;
+use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
 
-pub struct Client {
-    sender: MioSender<UserCommand>,
-    receiver: Receiver<ClientEvent>,
+use irc::{ClientEvent, Command, CommandBuilder, CommandType, CommandParser, UserCommand};
+
+struct IrcCodec {
+    parser: CommandParser,
+}
+impl IrcCodec {
+    fn new() -> IrcCodec {
+        IrcCodec {
+            parser: CommandParser::new(),
+        }
+    }
+}
+impl Codec for IrcCodec {
+    type In = Command;
+    type Out = Command;
+
+    fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Self::In>> {
+        if let Some(index) = buf.as_slice().iter().position(|x| *x == b'\n') {
+            let msg = buf.drain_to(index + 1).as_slice().into();
+            let msg = self.parser.parse(&msg);
+            Ok(Some(msg))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<()> {
+        buf.append(&mut msg.to_string().into_bytes());
+        Ok(())
+    }
 }
 
+pub struct Client {
+    sender: FutSender<Command>,
+    receiver: Receiver<Command>,
+    connected: Arc<AtomicBool>,
+    thread: JoinHandle<io::Result<()>>,
+}
 impl Client {
-    pub fn connect<S: ToSocketAddrs>(addr: S) -> Client
-    {
-        let (in_tx, in_rx) = channel();
-        let (out_tx, out_rx): (MioSender<UserCommand>, MioReceiver<UserCommand>) = mio_channel();
+    pub fn connect<S: ToSocketAddrs>(addr: S) -> Client {
         let addr = addr.to_socket_addrs().unwrap().next().unwrap();
+        let (in_tx, in_rx) = channel();
+        let (out_tx, out_rx) = fut_unbounded();
+        let core_out_tx = out_tx.clone();
+        let echo_in_tx = in_tx.clone();
 
-        thread::spawn(move || {
-            let poll = Poll::new().unwrap();
-            let socket = TcpStream::connect(&addr).unwrap();
+        let connected = Arc::new(AtomicBool::new(true));
+        let inner_connected = connected.clone();
 
-            let mut irc = Irc::new(socket, &poll);
-            poll.register(&out_rx, CLIENT_MSG, Ready::readable(), PollOpt::edge()).unwrap();
+        let thread = ::std::thread::spawn(move || {
+            let connected = inner_connected;
+            let core_tx = core_out_tx;
+            let echo_tx = echo_in_tx;
+            let mut core = Core::new().unwrap();
+            let handle = core.handle();
+            let c = TcpStream::connect(&addr, &handle)
+                .and_then(|stream| {
+                    let codec = IrcCodec::new();
+                    let (w, r) = stream.framed(codec).split();
+                    let incoming = r.for_each(|cmd| {
+                        match cmd.command {
+                            CommandType::Ping => {
+                                let pong = CommandBuilder::new()
+                                    .command(CommandType::Pong)
+                                    .add_param(cmd.params.data[0].clone())
+                                    .build().unwrap();
+                                let _ = FutSender::send(&core_tx, pong);
+                            },
+                            _ => {}
+                        }
+                        let _ = in_tx.send(cmd);
+                        Ok(())
+                    });
 
-            let mut events = Events::with_capacity(1024);
+                    let out = out_rx.map(move |cmd| {
+                        match cmd.command {
+                            CommandType::PrivMsg => {
+                                let _ = echo_tx.send(cmd.clone());
+                            },
+                            _ => {},
+                        }
+                        cmd
+                    }).map_err(|_| io::Error::new(io::ErrorKind::Other, "Recv Error"));
 
-            loop {
-                poll.poll(&mut events, None).unwrap();
+                    let outgoing =
+                        w.send_all(out)
+                        .map(|_| ());
 
-                for event in events.iter() {
-                    match event.token() {
-                        CLIENT => {
-                            if event.kind().is_readable() {
-                                loop {
-                                    match irc.read() {
-                                        Ok(Some(msg)) => {
-                                            match msg.command {
-                                                CommandType::Ping => {
-                                                    let pong = CommandBuilder::new()
-                                                        .command(CommandType::Pong)
-                                                        .add_param(msg.params.data[0].clone())
-                                                        .build().unwrap();
-                                                    irc.buf_write(pong);
-                                                },
-                                                _ => {},
-                                            }
-                                            match ClientEvent::from_command(&msg) {
-                                                Some(ev) => in_tx.send(ev).unwrap(),
-                                                _ => {} ,
-                                            }
-                                            let _ = in_tx.send(ClientEvent::Command(msg));
-                                        },
-                                        Ok(None) => break,
-                                        Err(_) => break,
-                                    }
-                                }
-                            }
+                    let watchdog = Interval::new(::std::time::Duration::from_millis(50), &handle)
+                        .unwrap()
+                        .take_while(|_| Ok(connected.load(Ordering::SeqCst)))
+                        .collect()
+                        .map(|_| ());
 
-                            if event.kind().is_writable() {
-                                let _ = irc.write();
-                            }
-                        },
-                        CLIENT_MSG => {
-                            match out_rx.try_recv() {
-                                Ok(msg) => {
-                                    let command = msg.to_command().unwrap();
-                                    match command.command {
-                                        CommandType::PrivMsg  => {
-                                            let _ = in_tx.send(
-                                                ClientEvent::from_command(&command).unwrap());
-                                        },
-                                        _ => {},
-                                    }
-                                    irc.buf_write(command);
-                                },
-                                _ => return,
-                            }
-                            poll.reregister(&out_rx,
-                                            CLIENT_MSG,
-                                            Ready::readable(),
-                                            PollOpt::edge()).unwrap();
-                        },
-                        _ => unreachable!(),
-                    }
-                }
-            }
+                    incoming
+                        .select(outgoing).map(|_| ()).map_err(|(e, _next)| e)
+                        .select(watchdog).map(|_| ()).map_err(|(e, _next)| e)
+                }).map(|_|());
+
+            let r = core.run(c);
+            connected.store(false, Ordering::SeqCst);
+            r
         });
 
         Client {
             sender: out_tx,
             receiver: in_rx,
+            connected: connected,
+            thread: thread,
         }
     }
 
-    pub fn poll_messages(&mut self) -> PollMessagesIter {
+    pub fn is_connected(&self) -> bool {
+        self.connected.load(Ordering::SeqCst)
+    }
+
+    pub fn poll_messages(&self) -> PollMessagesIter {
         PollMessagesIter {
             source: &self.receiver,
         }
     }
 
-    pub fn send_message(&mut self, cmd: UserCommand) {
-        let _ = self.sender.send(cmd);
+    pub fn send_message(&self, cmd: UserCommand) {
+        let _ = FutSender::send(&self.sender, cmd.to_command().unwrap());
+    }
+
+    pub fn close(self) -> io::Result<()> {
+        self.connected.store(false, Ordering::SeqCst);
+        self.thread.join().map_err(|e| panic!(e)).unwrap()
     }
 }
 
 pub struct PollMessagesIter<'a> {
-    source: &'a Receiver<ClientEvent>,
+    source: &'a Receiver<Command>,
 }
 
 impl<'a> Iterator for PollMessagesIter<'a> {
     type Item = ClientEvent;
     fn next(&mut self) -> Option<Self::Item> {
         match self.source.try_recv() {
-            Ok(e) => Some(e),
+            Ok(e) => {
+                match ClientEvent::from_command(&e) {
+                    Some(ce) => Some(ce),
+                    None => Some(ClientEvent::Command(e)),
+                }
+            },
             _ => None,
-        }
-    }
-}
-
-
-
-pub mod tokio {
-    extern crate tokio_core;
-    extern crate futures;
-
-    use self::tokio_core::net::TcpStream;
-    use self::tokio_core::io::{Codec, EasyBuf, Io};
-    use self::tokio_core::reactor::{Core, Interval};
-    use self::futures::{Stream, Future, Sink};
-    use self::futures::sync::mpsc::{
-        unbounded as fut_unbounded,
-        UnboundedSender as FutSender,
-    };
-    use std::io;
-    use std::net::ToSocketAddrs;
-    use std::sync::Arc;
-    use std::sync::mpsc::{channel, Receiver};
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::thread::JoinHandle;
-
-    use irc::{ClientEvent, Command, CommandBuilder, CommandType, CommandParser, UserCommand};
-
-    struct IrcCodec {
-        parser: CommandParser,
-    }
-    impl IrcCodec {
-        fn new() -> IrcCodec {
-            IrcCodec {
-                parser: CommandParser::new(),
-            }
-        }
-    }
-    impl Codec for IrcCodec {
-        type In = Command;
-        type Out = Command;
-
-        fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Self::In>> {
-            if let Some(index) = buf.as_slice().iter().position(|x| *x == b'\n') {
-                let msg = buf.drain_to(index + 1).as_slice().into();
-                let msg = self.parser.parse(&msg);
-                Ok(Some(msg))
-            } else {
-                Ok(None)
-            }
-        }
-
-        fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<()> {
-            buf.append(&mut msg.to_string().into_bytes());
-            Ok(())
-        }
-    }
-
-    pub struct Client {
-        sender: FutSender<Command>,
-        receiver: Receiver<Command>,
-        connected: Arc<AtomicBool>,
-        thread: JoinHandle<io::Result<()>>,
-    }
-    impl Client {
-        pub fn connect<S: ToSocketAddrs>(addr: S) -> Client {
-            let addr = addr.to_socket_addrs().unwrap().next().unwrap();
-            let (in_tx, in_rx) = channel();
-            let (out_tx, out_rx) = fut_unbounded();
-            let core_out_tx = out_tx.clone();
-            let echo_in_tx = in_tx.clone();
-
-            let connected = Arc::new(AtomicBool::new(true));
-            let inner_connected = connected.clone();
-
-            let thread = ::std::thread::spawn(move || {
-                let connected = inner_connected;
-                let core_tx = core_out_tx;
-                let echo_tx = echo_in_tx;
-                let mut core = Core::new().unwrap();
-                let handle = core.handle();
-                let c = TcpStream::connect(&addr, &handle)
-                    .and_then(|stream| {
-                        let codec = IrcCodec::new();
-                        let (w, r) = stream.framed(codec).split();
-                        let incoming = r.for_each(|cmd| {
-                            match cmd.command {
-                                CommandType::Ping => {
-                                    let pong = CommandBuilder::new()
-                                        .command(CommandType::Pong)
-                                        .add_param(cmd.params.data[0].clone())
-                                        .build().unwrap();
-                                    let _ = FutSender::send(&core_tx, pong);
-                                },
-                                _ => {}
-                            }
-                            let _ = in_tx.send(cmd);
-                            Ok(())
-                        });
-
-                        let out = out_rx.map(move |cmd| {
-                            match cmd.command {
-                                CommandType::PrivMsg => {
-                                    let _ = echo_tx.send(cmd.clone());
-                                },
-                                _ => {},
-                            }
-                            cmd
-                        }).map_err(|_| io::Error::new(io::ErrorKind::Other, "Recv Error"));
-
-                        let outgoing =
-                            w.send_all(out)
-                            .map(|_| ());
-
-                        let watchdog = Interval::new(::std::time::Duration::from_millis(50), &handle)
-                            .unwrap()
-                            .take_while(|_| Ok(connected.load(Ordering::SeqCst)))
-                            .collect()
-                            .map(|_| ());
-
-                        incoming
-                            .select(outgoing).map(|_| ()).map_err(|(e, _next)| e)
-                            .select(watchdog).map(|_| ()).map_err(|(e, _next)| e)
-                    }).map(|_|());
-
-                let r = core.run(c);
-                connected.store(false, Ordering::SeqCst);
-                r
-            });
-
-            Client {
-                sender: out_tx,
-                receiver: in_rx,
-                connected: connected,
-                thread: thread,
-            }
-        }
-
-        pub fn is_connected(&self) -> bool {
-            self.connected.load(Ordering::SeqCst)
-        }
-
-        pub fn poll_messages(&self) -> PollMessagesIter {
-            PollMessagesIter {
-                source: &self.receiver,
-            }
-        }
-
-        pub fn send_message(&self, cmd: UserCommand) {
-            let _ = FutSender::send(&self.sender, cmd.to_command().unwrap());
-        }
-
-        pub fn close(self) -> io::Result<()> {
-            self.connected.store(false, Ordering::SeqCst);
-            self.thread.join().map_err(|e| panic!(e)).unwrap()
-        }
-    }
-
-    pub struct PollMessagesIter<'a> {
-        source: &'a Receiver<Command>,
-    }
-
-    impl<'a> Iterator for PollMessagesIter<'a> {
-        type Item = ClientEvent;
-        fn next(&mut self) -> Option<Self::Item> {
-            match self.source.try_recv() {
-                Ok(e) => {
-                    match ClientEvent::from_command(&e) {
-                        Some(ce) => Some(ce),
-                        None => Some(ClientEvent::Command(e)),
-                    }
-                },
-                _ => None,
-            }
         }
     }
 }
