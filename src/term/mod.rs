@@ -54,14 +54,14 @@ impl Terminal {
         term
     }
 
-    pub fn run(&mut self) {
+    pub fn run(mut self) {
         self.client.send_message(UserCommand::Nick(
             self.nickname.to_string()));
         self.client.send_message(UserCommand::User(
             self.nickname.to_string(),
             "8".to_string(),
             self.realname.to_string()));
-        loop {
+        while self.client.is_connected() {
             for message in self.client.poll_messages() {
                 match message {
                     ClientEvent::Command(m) => {
@@ -147,6 +147,12 @@ impl Terminal {
             self.text_input.set_cursor(&mut self.stream, &self.window);
 
             thread::sleep(Duration::from_millis(50));
+        }
+
+        drop(self.stream);
+        match self.client.close() {
+            Err(e) => panic!("From Client: {}", e),
+            _ => {}
         }
     }
 

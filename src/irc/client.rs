@@ -130,7 +130,7 @@ pub mod tokio {
 
     use self::tokio_core::net::TcpStream;
     use self::tokio_core::io::{Codec, EasyBuf, Io};
-    use self::tokio_core::reactor::Core;
+    use self::tokio_core::reactor::{Core, Interval};
     use self::futures::{Stream, Future, Sink};
     use self::futures::sync::mpsc::{
         unbounded as fut_unbounded,
@@ -138,7 +138,10 @@ pub mod tokio {
     };
     use std::io;
     use std::net::ToSocketAddrs;
+    use std::sync::Arc;
     use std::sync::mpsc::{channel, Receiver};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::thread::JoinHandle;
 
     use irc::{ClientEvent, Command, CommandBuilder, CommandType, CommandParser, UserCommand};
 
@@ -175,6 +178,8 @@ pub mod tokio {
     pub struct Client {
         sender: FutSender<Command>,
         receiver: Receiver<Command>,
+        connected: Arc<AtomicBool>,
+        thread: JoinHandle<io::Result<()>>,
     }
     impl Client {
         pub fn connect<S: ToSocketAddrs>(addr: S) -> Client {
@@ -183,7 +188,12 @@ pub mod tokio {
             let (out_tx, out_rx) = fut_unbounded();
             let core_out_tx = out_tx.clone();
             let echo_in_tx = in_tx.clone();
-            ::std::thread::spawn(move || {
+
+            let connected = Arc::new(AtomicBool::new(true));
+            let inner_connected = connected.clone();
+
+            let thread = ::std::thread::spawn(move || {
+                let connected = inner_connected;
                 let core_tx = core_out_tx;
                 let echo_tx = echo_in_tx;
                 let mut core = Core::new().unwrap();
@@ -219,28 +229,34 @@ pub mod tokio {
 
                         let outgoing =
                             w.send_all(out)
-                            .map(|_| ())
-                            .map_err(|e|{
-                                error!("Outgoing Command: {:?}", e);
-                                ()
-                            });
-                        handle.spawn(outgoing);
+                            .map(|_| ());
+
+                        let watchdog = Interval::new(::std::time::Duration::from_millis(50), &handle)
+                            .unwrap()
+                            .take_while(|_| Ok(connected.load(Ordering::SeqCst)))
+                            .collect()
+                            .map(|_| ());
 
                         incoming
-                    });
+                            .select(outgoing).map(|_| ()).map_err(|(e, _next)| e)
+                            .select(watchdog).map(|_| ()).map_err(|(e, _next)| e)
+                    }).map(|_|());
 
-                error!("Connecting...");
                 let r = core.run(c);
-                match r {
-                    Err(e) => error!("Connection Closed: {:?}", e),
-                    _ => error!("Connection Closed"),
-                }
+                connected.store(false, Ordering::SeqCst);
+                r
             });
 
             Client {
                 sender: out_tx,
                 receiver: in_rx,
+                connected: connected,
+                thread: thread,
             }
+        }
+
+        pub fn is_connected(&self) -> bool {
+            self.connected.load(Ordering::SeqCst)
         }
 
         pub fn poll_messages(&self) -> PollMessagesIter {
@@ -251,6 +267,11 @@ pub mod tokio {
 
         pub fn send_message(&self, cmd: UserCommand) {
             let _ = FutSender::send(&self.sender, cmd.to_command().unwrap());
+        }
+
+        pub fn close(self) -> io::Result<()> {
+            self.connected.store(false, Ordering::SeqCst);
+            self.thread.join().map_err(|e| panic!(e)).unwrap()
         }
     }
 
