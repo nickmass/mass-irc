@@ -55,9 +55,7 @@ impl ChatWindows {
                     }
                 }
             },
-            None => {
-            
-            }
+            None => {}
         }
     }
 
@@ -107,9 +105,7 @@ impl ChatWindows {
                                     self.message_pane.set_dirty();
                                 }
                             },
-                            Err(_) => {}
-                            
-                        }
+                            Err(_) => {}}
                     },
                     None =>  {},
                 }

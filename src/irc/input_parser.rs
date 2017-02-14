@@ -54,7 +54,7 @@ impl UserInputParser {
             },
             "/topic" => {
                 if parts.1.trim().len() > 0 {
-                    UserCommand::SetTopic(state.active_window.clone(), parts.1.to_string())   
+                    UserCommand::SetTopic(state.active_window.clone(), parts.1.to_string())
                 } else if parts.1.len() > 0 {
                     UserCommand::SetTopic(state.active_window.clone(), "".to_string())
                 } else {

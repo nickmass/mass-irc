@@ -188,4 +188,3 @@ impl TextInput {
         let _ = stream.flush();
     }
 }
-

@@ -128,7 +128,7 @@ impl TermString {
                     for span in res {
                         term_string.append(&mut span.clone());
                     }
-                    
+
                     TermString { internal: term_string }
                 }));
 
@@ -136,8 +136,8 @@ impl TermString {
         let r = term_string(string);
 
         r.unwrap().1
-    } 
-    
+    }
+
     pub fn len(&self) -> usize {
         self.internal.len()
     }

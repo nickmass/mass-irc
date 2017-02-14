@@ -173,7 +173,7 @@ impl Message {
         } else {
             "\0color:White;background:Grayscale(25);\0"
         };
-        
+
         let chars: Vec<char> = message.chars().collect();
         let mut char_count = chars.len() as i32;
         for i in 0..height {
@@ -191,7 +191,7 @@ impl Message {
             }
             surface.formatted_text(line_buf.into(), Point(name_width, i));
         }
-        
+
         Message {
             width: width,
             height: height,
@@ -201,7 +201,7 @@ impl Message {
             surface: surface,
         }
     }
-    
+
     fn resize(&self, width: i32) -> Message {
         match self.name.clone() {
             Some(name) => {
@@ -228,7 +228,7 @@ impl Message {
             "Red" ,
             "Yellow"];
         let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
-        
+
         format!("\0color:White;background:Black;\0 [\0color:{};\0{: >width$.width$}\0color:White;\0] "
                 ,color_options[index as usize]
                 ,nick, width = width as usize - 4)

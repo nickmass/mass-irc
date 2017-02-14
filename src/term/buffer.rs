@@ -58,7 +58,7 @@ impl Color {
             }
         }
     }
-    
+
     pub fn bg_code(&self) -> String {
         match *self {
             Color::Black => "40".to_string(),
@@ -101,8 +101,6 @@ impl Glyph {
         } else {
             self.0
         };
-        
-
 
         if self.1.is_some() && self.2.is_some() {
             let fg = self.1.unwrap().fg_code();
@@ -324,7 +322,7 @@ impl TermBuffer {
 
     pub fn set_invalid(&mut self) { self.invalid = true; }
     pub fn is_invalid(&self) -> bool { self.invalid }
-    
+
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 

@@ -31,7 +31,7 @@ pub enum Modifier {
 
 pub struct KeyReader {
     read_buf: VecDeque<u8>,
-    escape_buf: VecDeque<u8>,
+    escape_buf: Vec<u8>,
     alt_modifier: bool,
 }
 
@@ -39,7 +39,7 @@ impl KeyReader {
     pub fn new() -> KeyReader {
         KeyReader {
             read_buf: VecDeque::new(),
-            escape_buf: VecDeque::new(),
+            escape_buf: Vec::new(),
             alt_modifier: false,
         }
     }
@@ -59,8 +59,8 @@ impl KeyReader {
             let c = c.unwrap();
 
             if c == b'\x1b' || self.escape_buf.len() != 0 {
-                self.escape_buf.push_back(c);
-                let key = match self.escape_buf.as_slices().0 {
+                self.escape_buf.push(c);
+                let key = match self.escape_buf.as_slice() {
                     b"\x1b"   | b"\x1b["  | b"\x1b[2" |
                     b"\x1b[3" | b"\x1b[5" | b"\x1b[6" |
                     b"\x1b[7" | b"\x1b[8" => None,
@@ -75,9 +75,9 @@ impl KeyReader {
                     b"\x1b[7~" => Some(Key::Home),
                     b"\x1b[8~" => Some(Key::End),
                     _ => {
-                        let _ = self.escape_buf.pop_front().unwrap();
+                        let _ = self.escape_buf.remove(0);
                         while self.escape_buf.len() != 0 {
-                            let c = self.escape_buf.pop_back().unwrap();
+                            let c = self.escape_buf.pop().unwrap();
                             self.read_buf.push_front(c);
                         }
                         if !self.alt_modifier {

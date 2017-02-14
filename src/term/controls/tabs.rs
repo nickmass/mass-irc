@@ -50,7 +50,7 @@ impl Tab {
             next: 0,
         }
     }
-    
+
     fn set_status(&mut self, status: TabStatus) {
         self.status = status;
     }
