@@ -6,7 +6,8 @@ pub enum ClientEvent {
     PrivateMessage(Option<String>, String),
     JoinChannel(String, Option<String>),
     LeaveChannel(String, Option<String>),
-    NoticeMessage(String, Option<String>, String),
+    ChannelNotice(String, Option<String>, String),
+    PrivateNotice(Option<String>, String),
     Topic(String, String),
     Names(String, Vec<String>),
     NamesEnd(String),
@@ -44,7 +45,12 @@ impl ClientEvent {
             CommandType::Notice => {
                 let target = command.get_param(0).unwrap_or("ERROR").to_string();
                 let message = command.get_param(1).unwrap_or("ERROR").to_string();
-                Some(ClientEvent::NoticeMessage(target, sender, message))
+
+                if target.starts_with("#") {
+                    Some(ClientEvent::ChannelNotice(target, sender, message))
+                } else {
+                    Some(ClientEvent::PrivateNotice(sender, message))
+                }
             },
             CommandType::Topic => {
                 let target = command.get_param(0).unwrap_or("ERROR").to_string();

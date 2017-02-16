@@ -5,7 +5,7 @@ use std::io::Write;
 use std::collections::VecDeque;
 
 pub struct TextInput {
-    history: VecDeque<Vec<u8>>,
+    history: VecDeque<Vec<char>>,
     history_index: usize,
     cursor: i32,
     dirty: bool,
@@ -102,15 +102,15 @@ impl TextInput {
                             return Some(UserInput::Text(result));
                         },
                         Key::Printable(c) => {
-                            self.type_character(c as u8);
+                            self.type_character(c);
                         },
                         _ => {}
                     }
                 },
                 Modifier::Alt(k) => {
                     match k {
-                        Key::Printable(c) if c.is_digit(10) => {
-                            return Some(UserInput::SetTab(c as u32 - 48));
+                        Key::Printable(c) if (c as u32) >= 0x30 && (c as u32) < 0x3A => {
+                            return Some(UserInput::SetTab(c as u32 - 0x30));
                         },
                         Key::Left => {
                             return Some(UserInput::PrevTab);
@@ -128,10 +128,11 @@ impl TextInput {
     }
 
     pub fn current_line(&self) -> String {
-        String::from_utf8(self.history[self.history_index].clone()).unwrap()
+        use ::std::iter::FromIterator;
+        String::from_iter(self.history[self.history_index].iter().map(|x|*x))
     }
 
-    fn type_character(&mut self, c: u8) {
+    fn type_character(&mut self, c: char) {
         let len = self.history[self.history_index].len() as i32;
         if self.cursor <= len {
             self.set_dirty();

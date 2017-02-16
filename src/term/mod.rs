@@ -3,13 +3,14 @@ pub use self::stream::TermStream;
 pub mod buffer;
 pub use self::buffer::{Color, Point, Rect, Surface, TermBuffer};
 pub mod controls;
-pub use self::controls::{MessagePane, TextInput, TabBar, TabStatus, TabToken};
+pub use self::controls::{MessagePane, MessageType, TextInput, TabBar, TabStatus, TabToken};
 mod keys;
 pub use self::keys::{Modifier, Key, KeyReader};
 pub mod term_string;
 pub use self::term_string::{TermString};
 mod window;
 use self::window::ChatWindows;
+mod text;
 
 use irc::{Client as IrcClient, ClientEvent, UserInputParser, UserCommand};
 use std::thread;
@@ -72,7 +73,14 @@ impl Terminal {
                                               sender.as_ref().map(|x| &**x)
                                                 .unwrap_or(&*self.nickname),
                                               &*self.nickname,
-                                              &message);
+                                              &message, MessageType::Normal);
+                    },
+                    ClientEvent::ChannelNotice(channel, sender, message) => {
+                        self.chat.add_chat_message(channel,
+                                                   sender.as_ref().map(|x| &**x)
+                                                   .unwrap_or(&*self.nickname),
+                                                   &*self.nickname,
+                                                   &message, MessageType::Notice);
                     },
                     ClientEvent::JoinChannel(channel, sender) => {
                         let sender = sender.unwrap_or("".to_string());

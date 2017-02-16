@@ -5,8 +5,6 @@ pub struct TermString {
     internal: Vec<Glyph>,
 }
 
-// "[{color:'Green';background:'Red';}NickMass{color:'Black';}]:
-// Hello {color:'Yellow';}Person{color:'Black';} how are you?
 impl TermString {
     pub fn new() -> TermString {
         TermString {

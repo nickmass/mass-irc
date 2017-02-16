@@ -1,4 +1,4 @@
-use term::controls::{TabBar, TabToken, TabStatus, MessagePane};
+use term::controls::{TabBar, TabToken, TabStatus, MessagePane, MessageType};
 use term::{TermBuffer};
 
 use std::collections::HashMap;
@@ -41,12 +41,12 @@ impl ChatWindows {
         }
     }
 
-    pub fn add_chat_message(&mut self, target: String, from: &str, to: &str,  msg: &str) {
+    pub fn add_chat_message(&mut self, target: String, from: &str, to: &str,  msg: &str, m_type: MessageType) {
         match self.find_tab(&target) {
             Some(wt) => {
                 let ref win = self.windows[&wt];
                 self.message_pane.add_chat_message(Some(win.tab),
-                    from.to_string(), msg.to_string());
+                    from.to_string(), msg.to_string(), m_type);
                 if Some(win.tab) != self.tab_bar.active_tab() {
                     if msg.contains(to) {
                         self.tab_bar.set_alert(win.tab)

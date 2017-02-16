@@ -71,7 +71,7 @@ impl Params {
     fn to_cmd(&self) -> String {
         let mut buf = String::new();
         buf.push(' ');
-        
+
         let n = self.data.len();
 
         if n > 0 {

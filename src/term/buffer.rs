@@ -238,7 +238,7 @@ impl Surface {
     }
 
     pub fn text(&mut self, text: &str, dest: Point) {
-        for i in 0..text.len() {
+        for i in 0..text.chars().count() {
             let x = i as i32;
             if x + dest.x() >= self.rect().width() { break; }
             self.set_char(text.chars().nth(i).unwrap(), Point(x + dest.x(), dest.y()));
@@ -258,7 +258,7 @@ impl Surface {
         }
     }
 
-    fn set_glyph(&mut self, val: Glyph, p: Point) {
+    pub fn set_glyph(&mut self, val: Glyph, p: Point) {
         let x = p.x() as usize;
         let y = p.y() as usize;
         if p.y() < self.area.height() && p.x() < self.area.width() &&

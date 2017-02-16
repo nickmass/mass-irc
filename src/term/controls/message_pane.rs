@@ -32,11 +32,11 @@ impl MessagePane {
     }
 
     pub fn add_chat_message(&mut self, tab: Option<TabToken>,
-                             name: String, message: String) {
+                             name: String, message: String, m_type: MessageType) {
         self.set_dirty();
         let index = self.messages.iter().filter(|x| x.0 == tab).count() as u32;
-       
-        let message = Message::from_chat(self.width, index, name, message);
+
+        let message = Message::from_chat(self.width, index, name, message, m_type);
 
         self.messages.push((tab, message));
     }
@@ -85,10 +85,17 @@ impl MessagePane {
             h -= m.1.height;
             rendered_msgs.blit(&m.1.surface, Point(0, h));
         }
-        
+
         window.blit(&rendered_msgs, Point(0,2));
         self.dirty = false;
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum MessageType {
+    Normal,
+    Notice,
+    Action,
 }
 
 struct Message {
@@ -98,6 +105,7 @@ struct Message {
     message: String,
     index: u32,
     surface: Surface,
+    m_type: MessageType,
 }
 
 impl Message {
@@ -143,10 +151,11 @@ impl Message {
             message: message,
             index: index,
             surface: surface,
+            m_type: MessageType::Normal,
         }
     }
 
-    pub fn from_chat(width: i32, index: u32, name: String, message: String)
+    pub fn from_chat(width: i32, index: u32, name: String, message: String, m_type: MessageType)
             -> Message {
         let name_width = 14;
         let msg_width = width - name_width;
@@ -159,7 +168,7 @@ impl Message {
         };
 
         let mut surface = Surface::new(Rect(Point(0, 0),width, height));
-        let name_string = Self::format_name(&*name, name_width);
+        let name_string = Self::format_name(&*name, name_width, m_type);
 
         surface.formatted_text(name_string.into(), Point(0,0));
         for i in 1..height { //Color gutter
@@ -199,13 +208,14 @@ impl Message {
             message: message,
             index: index,
             surface: surface,
+            m_type: m_type,
         }
     }
 
     fn resize(&self, width: i32) -> Message {
         match self.name.clone() {
             Some(name) => {
-                Message::from_chat(width, self.index, name, self.message.clone())
+                Message::from_chat(width, self.index, name, self.message.clone(), self.m_type)
             },
             None => {
                 Message::from_server(width, self.index, self.message.clone())
@@ -213,7 +223,7 @@ impl Message {
         }
     }
 
-    fn format_name(nick: &str, width: i32) -> String {
+    fn format_name(nick: &str, width: i32, m_type: MessageType) -> String {
         let color_options: [&'static str; 12] = 
             [ "Blue",
             "Cyan" ,
@@ -229,9 +239,17 @@ impl Message {
             "Yellow"];
         let index = nick.bytes().fold(0, |acc, x| acc ^ x) % 12;
 
-        format!("\0color:White;background:Black;\0 [\0color:{};\0{: >width$.width$}\0color:White;\0] "
-                ,color_options[index as usize]
-                ,nick, width = width as usize - 4)
+        match m_type {
+            MessageType::Normal => format!("\0color:White;background:Black;\0 [\0color:{};\0{: >width$.width$}\0color:White;\0] "
+                                         ,color_options[index as usize]
+                                         ,nick, width = width as usize - 4),
+            MessageType::Notice => format!("\0color:White;background:Black;\0 -\0color:{};\0{: >width$.width$}\0color:White;\0- "
+                                         ,color_options[index as usize]
+                                         ,nick, width = width as usize - 4),
+            MessageType::Action => format!("\0color:White;background:Black;\0 **\0color:{};\0{: >width$.width$}\0color:White;\0 "
+                    ,color_options[index as usize]
+                    ,nick, width = width as usize - 4),
+        }
     }
 }
 
