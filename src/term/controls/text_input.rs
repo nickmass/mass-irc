@@ -19,7 +19,7 @@ impl TextInput {
             history: VecDeque::new(),
             cursor: 0,
             dirty: true,
-            reader: KeyReader::new(),
+            reader: KeyReader::stdin(),
         };
 
         input.history.push_front(Vec::new());
@@ -30,9 +30,8 @@ impl TextInput {
     pub fn set_dirty(&mut self) { self.dirty = true; }
     pub fn is_dirty(&self) -> bool { self.dirty }
 
-    pub fn read(&mut self, stream: &mut TermStream) -> Option<UserInput> {
-        self.reader.fill(stream);
-        let keys: Vec<Modifier> = self.reader.by_ref().collect();
+    pub fn read(&mut self) -> Option<UserInput> {
+        let keys: Vec<_> = self.reader.by_ref().collect();
         for m in keys {
             match m {
                 Modifier::None(k) => {

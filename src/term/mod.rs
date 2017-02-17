@@ -111,7 +111,7 @@ impl Terminal {
                 }
             }
 
-            match self.text_input.read(&mut self.stream) {
+            match self.text_input.read() {
                 Some(UserInput::Close) => break,
                 Some(UserInput::SetTab(c)) => {
                     self.chat.set_tab(c);

@@ -1,6 +1,6 @@
-use term::TermStream;
-
+use termion::{async_stdin, AsyncReader};
 use std::collections::VecDeque;
+use std::io::Read;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Key {
@@ -21,6 +21,7 @@ pub enum Key {
     Esc,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Modifier {
     None(Key),
     Alt(Key),
@@ -91,88 +92,171 @@ impl Utf8 {
     }
 }
 
-pub struct KeyReader {
-    read_buf: VecDeque<u8>,
-    escape_buf: Vec<u8>,
-    alt_modifier: bool,
-    utf8_mode: Utf8,
+fn is_printable(c: char) -> bool {
+    let c = c as u32;
+    !(c < 0x20 || (c >= 0x7f &&  c < 0xa0))
 }
 
-impl KeyReader {
-    pub fn new() -> KeyReader {
-        KeyReader {
-            read_buf: VecDeque::new(),
-            escape_buf: Vec::new(),
-            alt_modifier: false,
-            utf8_mode: Utf8::new(),
+pub struct TermIterator {
+    stream: AsyncReader,
+    buffer: VecDeque<u8>,
+}
+
+impl TermIterator {
+    fn new() -> Self {
+        TermIterator {
+            stream: async_stdin(),
+            buffer: VecDeque::new(),
         }
     }
+}
 
-    pub fn fill(&mut self, stream: &mut TermStream) {
-        let mut buf = [0;128];
-        if let Ok(bytes) = stream.read(&mut buf) {
-            self.read_buf.extend(&buf[0..bytes])
+impl Iterator for TermIterator {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.buffer.pop_front() {
+            next @ Some(..) => next,
+            None => {
+                let mut buf = [0; 1024];
+                if let Ok(bytes) = self.stream.read(&mut buf) {
+                    self.buffer.extend(&buf[0..bytes])
+                }
+                self.buffer.pop_front()
+            }
         }
     }
+}
 
-    fn read_key(&mut self) -> Option<Key> { 
+pub struct Utf8Iterator<T> {
+    state: Utf8,
+    stream: T,
+}
+
+impl<T> Utf8Iterator<T> where T: Iterator<Item=u8> {
+    fn new(stream: T) -> Self {
+        Utf8Iterator {
+            state: Utf8::new(),
+            stream: stream,
+        }
+    }
+}
+
+impl<T> Iterator for Utf8Iterator<T> where T: Iterator<Item=u8> {
+    type Item = char;
+
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let c = self.read_buf.pop_front();
-
-            if c.is_none() { return None; }
+            let c = self.stream.next();
+            if c.is_none() {
+                return None;
+            }
             let c = c.unwrap();
 
-
-            self.utf8_mode = self.utf8_mode.extend(c);
-            let next = match self.utf8_mode {
+            self.state = self.state.extend(c);
+            match self.state {
                 Utf8::Parsing(..) => continue,
                 Utf8::Invalid => {
                     error!("Invalid");
-                    self.utf8_mode = Utf8::new();
+                    self.state = Utf8::new();
                     continue
                 },
                 Utf8::Done(c) => {
-                    self.utf8_mode = Utf8::new();
-                    c
+                    self.state = Utf8::new();
+                    return Some(c);
                 },
+            }
+        }
+    }
+}
+
+pub struct KeyIterator<T> {
+    stream: T,
+    escape_buffer: String,
+    escaping: bool,
+    alt: bool,
+}
+
+pub type KeyReader = KeyIterator<Utf8Iterator<TermIterator>>;
+impl<T> KeyIterator<T> {
+    pub fn stdin() -> KeyIterator<Utf8Iterator<TermIterator>> {
+        KeyIterator {
+            stream: Utf8Iterator::new(TermIterator::new()),
+            escape_buffer: String::new(),
+            escaping: false,
+            alt: false,
+        }
+    }
+}
+
+impl<T> Iterator for KeyIterator<T> where T: Iterator<Item=char> {
+    type Item = Modifier;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let next = if !self.escaping && self.escape_buffer.len() != 0 {
+                self.escape_buffer.remove(0)
+            } else {
+                let next = self.stream.next();
+                if next.is_none() {
+                    if self.escape_buffer == "\x1b" {
+                        self.escaping = false;
+                        self.escape_buffer.clear();
+                        if self.alt {
+                            self.alt = false;
+                            return Some(Modifier::Alt(Key::Esc));
+                        } else {
+                            return Some(Modifier::None(Key::Esc));
+                        }
+                    } else {
+                        return None;
+                    }
+                } else {
+                    next.unwrap()
+                }
             };
 
-            //This is not utf8 aware, but it might just sort of work??
-            if next == '\x1b' || self.escape_buf.len() != 0 {
-                self.escape_buf.push(c);
-                let key = match self.escape_buf.as_slice() {
-                    b"\x1b"   | b"\x1b["  | b"\x1b[2" |
-                    b"\x1b[3" | b"\x1b[5" | b"\x1b[6" |
-                    b"\x1b[7" | b"\x1b[8" => None,
-                    b"\x1b[A" => Some(Key::Up),
-                    b"\x1b[B" => Some(Key::Down),
-                    b"\x1b[C" => Some(Key::Right),
-                    b"\x1b[D" => Some(Key::Left),
-                    b"\x1b[2~" => Some(Key::Ins),
-                    b"\x1b[3~" => Some(Key::Del),
-                    b"\x1b[5~" => Some(Key::PageUp),
-                    b"\x1b[6~" => Some(Key::PageDown),
-                    b"\x1b[7~" => Some(Key::Home),
-                    b"\x1b[8~" => Some(Key::End),
-                    _ => {
-                        let _ = self.escape_buf.remove(0);
-                        while self.escape_buf.len() != 0 {
-                            let c = self.escape_buf.pop().unwrap();
-                            self.read_buf.push_front(c);
-                        }
-                        if !self.alt_modifier {
-                            self.alt_modifier = true;
-                            None
-                        } else {
-                            Some(Key::Esc)
-                        }
-                    }
+            if next == '\x1b' { self.escaping = true; }
+
+            if self.escaping {
+                self.escaping = false;
+                self.escape_buffer.push(next);
+                let escaped_key = match &*self.escape_buffer {
+                    "\x1b"   | "\x1b["  | "\x1b[2" |
+                    "\x1b[3" | "\x1b[5" | "\x1b[6" |
+                    "\x1b[7" | "\x1b[8" => {
+                        self.escaping = true;
+                        None
+                    },
+                    "\x1b[A" => Some(Key::Up),
+                    "\x1b[B" => Some(Key::Down),
+                    "\x1b[C" => Some(Key::Right),
+                    "\x1b[D" => Some(Key::Left),
+                    "\x1b[2~" => Some(Key::Ins),
+                    "\x1b[3~" => Some(Key::Del),
+                    "\x1b[5~" => Some(Key::PageUp),
+                    "\x1b[6~" => Some(Key::PageDown),
+                    "\x1b[7~" => Some(Key::Home),
+                    "\x1b[8~" => Some(Key::End),
+                    _ => None,
                 };
 
-                if key == None { continue; }
+                if escaped_key.is_some() {
+                    self.escape_buffer.clear();
+                    return if self.alt {
+                        self.alt = false;
+                        escaped_key.map(|k| Modifier::Alt(k))
+                    } else {
+                        escaped_key.map(|k| Modifier::None(k))
+                    }
+                }
 
-                self.escape_buf.clear();
-                return key;
+                if !self.escaping {
+                    self.escape_buffer.remove(0);
+                    self.alt = true;
+                }
+
+                continue;
             }
 
             let key = match next {
@@ -181,7 +265,7 @@ impl KeyReader {
                 '\x0D' => Some(Key::Return),
                 '\x0A' => None,
                 key => {
-                    if Self::is_printable(key) {
+                    if is_printable(key) {
                         Some(Key::Printable(key))
                     } else {
                         None
@@ -189,31 +273,15 @@ impl KeyReader {
                 },
             };
 
-            if key == None { continue; }
-            return key;
-        }
-    }
+            if key.is_none() { continue; }
 
-    fn is_printable(c: char) -> bool {
-        let c = c as u32;
-        !(c < 0x20 || (c >= 0x7f &&  c < 0xa0))
+            return if self.alt {
+                self.alt = false;
+                Some(Modifier::Alt(key.unwrap()))
+            } else {
+                Some(Modifier::None(key.unwrap()))
+            }
+        }
     }
 }
 
-impl Iterator for KeyReader {
-    type Item=Modifier;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.read_key() {
-            Some(k) => {
-                if self.alt_modifier {
-                    self.alt_modifier = false;
-                    Some(Modifier::Alt(k))
-                } else {
-                    Some(Modifier::None(k))
-                }
-            },
-            None => None
-        }
-    }
-
-}
