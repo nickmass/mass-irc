@@ -157,7 +157,6 @@ impl<T> Iterator for Utf8Iterator<T> where T: Iterator<Item=u8> {
             match self.state {
                 Utf8::Parsing(..) => continue,
                 Utf8::Invalid => {
-                    error!("Invalid");
                     self.state = Utf8::new();
                     continue
                 },
@@ -268,7 +267,13 @@ impl<T> Iterator for KeyIterator<T> where T: Iterator<Item=char> {
                     if is_printable(key) {
                         Some(Key::Printable(key))
                     } else {
-                        None
+                        let key32 = key as u32;
+                        if key32 < 0x20 {
+                            let key = (key32 as u8 + 0x60) as char;
+                            return Some(Modifier::Ctrl(Key::Printable(key)));
+                        } else {
+                            None
+                        }
                     }
                 },
             };
